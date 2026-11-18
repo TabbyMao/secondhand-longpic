@@ -8,7 +8,7 @@ A small web tool for selling second-hand items. It combines your item photos int
 
 - Upload each item's photos once, by choosing files or dragging them in; several photos of one item sit side by side
 - Price and description are added automatically in black text on white
-- Create as many long images as you like, name them, and pick which items go in each
+- Create as many long images as you like, name them (e.g. "Badminton", "Kitchen"), optionally show the name at the top of the image, and pick which items go in each
 - Mark an item as sold and it drops out of every long image automatically
 - Items are numbered so buyers can say "I want #3"
 - Three size presets (Smallest / Balanced / Sharp) to keep files small

@@ -143,6 +143,7 @@ label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4
         <div class="tabs" id="tabs" role="group"></div>
         <div class="groupbar" id="groupbar">
           <label for="gname"><span id="tGName"></span><input type="text" id="gname" autocomplete="off"></label>
+          <label class="check" for="gshow" style="flex:0 0 auto;align-self:center"><input type="checkbox" id="gshow"><span id="tGShow"></span></label>
           <button class="small" id="selAll" type="button"></button>
           <button class="small" id="selNone" type="button"></button>
           <button class="small danger" id="delGroup" type="button"></button>
@@ -184,7 +185,7 @@ const T = {
     save:'保存到清单', saveEdit:'保存修改', cancel:'取消编辑',
     needPhoto:'先选至少一张照片。', compress:'正在压缩照片…', badPhoto:'有一张照片读不出来，换成 JPG 或 PNG 再试。', saved:'已保存 ✓',
     list:'物品清单', ex:'下面是示例物品，方便你先看效果。', clearEx:'清除示例',
-    newImg:'+ 新建长图', gname:'长图名称（可选）', gnamePh:'例如：家具', defName:n=>`长图 ${n}`, delGroup:'删除这张长图', delGroupConfirm:'再点一次确认',
+    newImg:'+ 新建长图', gname:'长图名称', gnamePh:'例如：Badminton、Kitchen', gshow:'名称显示在图片顶部', defName:n=>`长图 ${n}`, delGroup:'删除这张长图', delGroupConfirm:'再点一次确认',
     selAll:'全选在售', selNone:'全不选', none:'还没有物品', count:(l,o)=>`在售 ${l} 件 · 这张长图选了 ${o} 件`,
     noPrice:'未标价', sold:'已售', example:'示例', markSold:'标记已售', unsold:'恢复在售', editBtn:'编辑', up:'上移', down:'下移', del:'删除', delConfirm:'再点一次确认',
     storeOk:'照片和信息存在这台设备的这个浏览器里，下次打开还在。换设备或清除浏览器数据后需要重新上传。',
@@ -202,7 +203,7 @@ const T = {
     save:'Save to list', saveEdit:'Save changes', cancel:'Cancel',
     needPhoto:'Choose at least one photo first.', compress:'Compressing photos…', badPhoto:'One photo could not be read. Try a JPG or PNG.', saved:'Saved ✓',
     list:'Item list', ex:'These are sample items so you can see how it works.', clearEx:'Remove samples',
-    newImg:'+ New long image', gname:'Image name (optional)', gnamePh:'e.g. Furniture', defName:n=>`Image ${n}`, delGroup:'Delete this image', delGroupConfirm:'Tap again to delete',
+    newImg:'+ New long image', gname:'Image name', gnamePh:'e.g. Badminton, Kitchen', gshow:'Show name at the top of the image', defName:n=>`Image ${n}`, delGroup:'Delete this image', delGroupConfirm:'Tap again to delete',
     selAll:'Select all for sale', selNone:'Select none', none:'No items yet', count:(l,o)=>`${l} for sale · ${o} in this image`,
     noPrice:'No price', sold:'Sold', example:'Sample', markSold:'Mark sold', unsold:'Back for sale', editBtn:'Edit', up:'Up', down:'Down', del:'Delete', delConfirm:'Tap again to delete',
     storeOk:'Photos and details are saved in this browser on this device and will be here next time. On another device, or after clearing browser data, upload again.',
@@ -225,7 +226,7 @@ function applyLang(){
   const set = (id, k) => { $(id).textContent = t(k); };
   set('tTitle','title'); set('tPick','pick'); set('tPrice','price'); set('tDesc','desc');
   set('cancelBtn','cancel'); set('tList','list'); set('tEx','ex'); set('clearEx','clearEx'); set('selAll','selAll'); set('selNone','selNone');
-  set('tGName','gname'); set('delGroup','delGroup'); set('tOut','out'); set('tCur','cur'); set('tNum','num');
+  set('tGName','gname'); set('tGShow','gshow'); set('delGroup','delGroup'); set('tOut','out'); set('tCur','cur'); set('tNum','num');
   $('desc').placeholder = t('descPh'); $('gname').placeholder = t('gnamePh');
   document.querySelector('[data-q=s]').textContent = t('qs');
   document.querySelector('[data-q=m]').textContent = t('qm');
@@ -262,7 +263,7 @@ async function putRaw(rec){
   memory.set(rec.id, rec);
 }
 const dbPut = it => putRaw({id:it.id, price:it.price, zh:it.zh||'', en:it.en||'', src:it.src||'', sold:it.sold, order:it.order, example:!!it.example, photos:it.photos});
-const saveGroups = () => putRaw({id:GROUPS_KEY, groups:groups.map(g => ({id:g.id, name:g.name, ids:[...g.ids]})), active});
+const saveGroups = () => putRaw({id:GROUPS_KEY, groups:groups.map(g => ({id:g.id, name:g.name, show:!!g.show, ids:[...g.ids]})), active});
 async function dbDel(id){ if(db){ try{ await tx('readwrite', s => s.delete(id)); return; }catch(e){ db = null; } } memory.delete(id); }
 function showStore(){ $('storeNote').textContent = persistent ? t('storeOk') : t('storeNo'); }
 
@@ -316,27 +317,29 @@ const gName = g => (g.name || '').trim() || t('defName')(gIndex(g) + 1);
 const activeGroup = () => groups.find(g => g.id === active) || null;
 const members = g => items.filter(it => g.ids.has(it.id) && !it.sold);   // 按清单顺序，跳过已售
 function newGroup(){
-  const g = {id:uid(), name:'', ids:new Set()}; groups.push(g); active = g.id; saveGroups(); return g;
+  const g = {id:uid(), name:'', show:false, ids:new Set()}; groups.push(g); active = g.id; saveGroups(); return g;
 }
 function renderTabs(){
   const box = $('tabs'); box.textContent = '';
   groups.forEach(g => {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'tab';
     b.style.setProperty('--gc', gColor(g)); b.setAttribute('aria-pressed', g.id === active);
-    const dot = document.createElement('i'); b.append(dot, `${gName(g)} · ${members(g).length}`);
+    const dot = document.createElement('i'); b.append(dot, gName(g)); b.title = t('items')(members(g).length);
     b.onclick = () => { active = g.id; saveGroups(); renderAll(); };
     box.append(b);
   });
   const add = document.createElement('button'); add.type = 'button'; add.className = 'small ghost'; add.textContent = t('newImg');
-  add.onclick = () => { newGroup(); renderAll(); schedule(); $('gname').focus(); };
+  add.onclick = () => { newGroup(); renderAll(); schedule(); $('gname').focus(); $('gname').select(); };
   box.append(add);
   const g = activeGroup();
   $('groupbar').hidden = !g;
   if(g){
     $('groupbar').style.setProperty('--gc', gColor(g));
     if(document.activeElement !== $('gname')) $('gname').value = g.name || '';
+    $('gshow').checked = !!g.show; $('gshow').disabled = !(g.name || '').trim();
   }
 }
+$('gshow').addEventListener('change', () => { const g = activeGroup(); if(!g) return; g.show = $('gshow').checked; saveGroups(); schedule(); });
 $('gname').addEventListener('input', () => {
   const g = activeGroup(); if(!g) return; g.name = $('gname').value; saveGroups(); renderTabs(); renderList(); schedule();
 });
@@ -560,10 +563,18 @@ function wrap(g, text, maxW){
   return lines;
 }
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif';
-function layout(g, group, W, numbered){
+function layout(g, group, W, numbered, title){
   const P = Math.round(W*.035), gap = Math.round(W*.012), sep = Math.round(W*.075);
   const fs1 = Math.round(W*.054), fs2 = Math.round(W*.037), inner = W - 2*P, ops = [];
   let y = P;
+  if(title){
+    const fsT = Math.round(W*.072);
+    g.font = `800 ${fsT}px ${FONT}`;
+    for(const ln of wrap(g, title, inner)){ ops.push({text:ln, font:g.font, x:P, y:y + fsT}); y += Math.round(fsT*1.25); }
+    y += Math.round(fsT*.25);
+    ops.push({rule:true, x:P, y, w:inner, h:Math.max(2, Math.round(W*.003))});
+    y += Math.round(W*.04);
+  }
   group.forEach((it, i) => {
     let k = 0;
     for(const n of splitRows(it.imgs.length)){
@@ -589,17 +600,18 @@ function layout(g, group, W, numbered){
   });
   return {H:Math.ceil(y), ops};
 }
-async function build(group){
+async function build(group, title){
   const pr = PRESETS[preset], numbered = $('num').checked;
   for(const it of group) it.imgs = await Promise.all(it.photos.map(loadImg));
   const c = document.createElement('canvas'), g = c.getContext('2d');
-  let W = pr.w, L = layout(g, group, W, numbered);
-  if(W*L.H > MAX_AREA){ W = Math.floor(W*Math.sqrt(MAX_AREA/(W*L.H))*.98); L = layout(g, group, W, numbered); }
+  let W = pr.w, L = layout(g, group, W, numbered, title);
+  if(W*L.H > MAX_AREA){ W = Math.floor(W*Math.sqrt(MAX_AREA/(W*L.H))*.98); L = layout(g, group, W, numbered, title); }
   c.width = W; c.height = L.H;
   g.fillStyle = '#fff'; g.fillRect(0,0,W,L.H);
   g.imageSmoothingQuality = 'high'; g.textBaseline = 'alphabetic';
   for(const o of L.ops){
-    if(o.im) g.drawImage(o.im, o.x, o.y, o.w, o.h);
+    if(o.rule){ g.fillStyle = '#d9d9d9'; g.fillRect(o.x, o.y, o.w, o.h); }
+    else if(o.im) g.drawImage(o.im, o.x, o.y, o.w, o.h);
     else{ g.font = o.font; g.fillStyle = '#000'; g.fillText(o.text, o.x, o.y); }
   }
   const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', pr.q));
@@ -620,7 +632,7 @@ async function generate(){
   if(!todo.length){ out.textContent = ''; $('genInfo').textContent = ''; return; }
   $('genInfo').textContent = t('generating');
   const results = [];
-  try{ for(const x of todo){ results.push({...x, r:await build(x.list)}); if(my !== run) return; } }
+  try{ for(const x of todo){ results.push({...x, r:await build(x.list, x.g.show && (x.g.name||'').trim() ? x.g.name.trim() : '')}); if(my !== run) return; } }
   catch(e){ $('genInfo').textContent = t('genFail'); return; }
   if(my !== run) return;
   liveUrls.forEach(u => URL.revokeObjectURL(u)); liveUrls = [];
@@ -711,7 +723,7 @@ async function seed(){
   items.sort((a,b) => a.order - b.order);
   if(gRec && Array.isArray(gRec.groups)){
     const ok = new Set(items.map(x => x.id));
-    groups = gRec.groups.map(g => ({id:g.id, name:g.name || '', ids:new Set((g.ids || []).filter(id => ok.has(id)))}));
+    groups = gRec.groups.map(g => ({id:g.id, name:g.name || '', show:!!g.show, ids:new Set((g.ids || []).filter(id => ok.has(id)))}));
     active = groups.some(g => g.id === gRec.active) ? gRec.active : (groups[0] && groups[0].id) || null;
   }else{
     // 第一次用分组：把之前勾选的物品按每 10 件放进长图（旧版的 sel 字段）
