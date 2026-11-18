@@ -62,6 +62,7 @@ label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4
 .lang button[aria-pressed=true],.seg button[aria-pressed=true]{background:var(--ink);color:var(--surface);font-weight:700}
 .pick{position:relative;border:1.5px dashed var(--muted);border-radius:8px;padding:12px;text-align:center;cursor:pointer;color:var(--ink);font-size:14px}
 .pick:hover{border-color:var(--ink)}
+.pick.drag{border-color:var(--ink);border-style:solid;background:var(--accent);color:var(--accent-ink)}
 .pick input{position:absolute;opacity:0;width:1px;height:1px}
 .pick:focus-within{outline:2px solid var(--ink);outline-offset:2px}
 .thumbs{display:flex;gap:6px;flex-wrap:wrap}
@@ -179,7 +180,7 @@ const $ = id => document.getElementById(id);
 /* ---------- 文案 ---------- */
 const T = {
   zh:{
-    title:'二手长图拼接', add:'添加物品', edit:'编辑物品', pick:'选择照片', price:'价格', desc:'描述', descPh:'宜家台灯，九成新，带灯泡，自取',
+    title:'二手长图拼接', add:'添加物品', edit:'编辑物品', pick:'选择照片，或把照片拖到这里', price:'价格', desc:'描述', descPh:'宜家台灯，九成新，带灯泡，自取',
     save:'保存到清单', saveEdit:'保存修改', cancel:'取消编辑',
     needPhoto:'先选至少一张照片。', compress:'正在压缩照片…', badPhoto:'有一张照片读不出来，换成 JPG 或 PNG 再试。', saved:'已保存 ✓',
     list:'物品清单', ex:'下面是示例物品，方便你先看效果。', clearEx:'清除示例',
@@ -197,7 +198,7 @@ const T = {
     item:'物品', aria:n=>`放进「${n}」`, rm:'移除这张照片', photo:'物品照片', fileBase:'二手长图'
   },
   en:{
-    title:'Yard Sale Long Pic', add:'Add an item', edit:'Edit item', pick:'Choose photos', price:'Price', desc:'Description', descPh:'IKEA desk lamp, like new, bulb included, pickup only',
+    title:'Yard Sale Long Pic', add:'Add an item', edit:'Edit item', pick:'Choose photos, or drag them here', price:'Price', desc:'Description', descPh:'IKEA desk lamp, like new, bulb included, pickup only',
     save:'Save to list', saveEdit:'Save changes', cancel:'Cancel',
     needPhoto:'Choose at least one photo first.', compress:'Compressing photos…', badPhoto:'One photo could not be read. Try a JPG or PNG.', saved:'Saved ✓',
     list:'Item list', ex:'These are sample items so you can see how it works.', clearEx:'Remove samples',
@@ -414,13 +415,27 @@ function renderDraft(){
   draft.photos.forEach((b,i) => box.append(thumbEl(b, () => { draft.photos.splice(i,1); renderDraft(); })));
 }
 $('desc').addEventListener('input', () => { $('desc').dataset.dirty = '1'; });
-$('files').addEventListener('change', async e => {
-  const fs = [...e.target.files]; e.target.value = '';
+async function addFiles(list){
+  const fs = [...list].filter(f => !f.type || f.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|heic|heif|bmp|avif)$/i.test(f.name));
+  if(!fs.length){ $('edMsg').textContent = t('badPhoto'); return; }
   $('edMsg').textContent = t('compress'); let bad = false;
-  for(const f of fs){ try{ const b = await shrink(f); if(b) draft.photos.push(b); }catch(err){ bad = true; } }
+  for(const f of fs){ try{ const b = await shrink(f); if(b){ draft.photos.push(b); renderDraft(); } }catch(err){ bad = true; } }
   $('edMsg').textContent = bad ? t('badPhoto') : '';
   renderDraft();
-});
+}
+$('files').addEventListener('change', e => { const fs = [...e.target.files]; e.target.value = ''; addFiles(fs); });
+/* 拖拽上传：拖到「选择照片」框或整个添加物品卡片上都可以 */
+(() => {
+  const zone = $('editor'), pick = document.querySelector('.pick'); let depth = 0;
+  const hasFiles = e => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+  zone.addEventListener('dragenter', e => { if(!hasFiles(e)) return; e.preventDefault(); depth++; pick.classList.add('drag'); });
+  zone.addEventListener('dragover', e => { if(!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  zone.addEventListener('dragleave', () => { depth = Math.max(0, depth-1); if(!depth) pick.classList.remove('drag'); });
+  zone.addEventListener('drop', e => { if(!hasFiles(e)) return; e.preventDefault(); depth = 0; pick.classList.remove('drag'); addFiles(e.dataTransfer.files); });
+  // 拖到页面其他地方时，不要让浏览器直接打开图片
+  window.addEventListener('dragover', e => { if(hasFiles(e)) e.preventDefault(); });
+  window.addEventListener('drop', e => { if(hasFiles(e)) e.preventDefault(); });
+})();
 function resetEditor(){
   draft = {id:null, photos:[], shown:''}; $('price').value=''; $('desc').value=''; delete $('desc').dataset.dirty;
   $('edTitle').textContent = t('add'); $('saveBtn').textContent = t('save'); $('cancelBtn').hidden = true; renderDraft();
