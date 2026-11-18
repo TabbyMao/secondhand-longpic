@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>二手长图拼接</title>
+<style>
+/* 简洁浅色风，固定浅色主题，不跟随系统。布局：左边编辑 + 清单，右边长图；手机上一列 */
+:root, :root[data-theme="dark"], :root[data-theme="light"]{
+  --page:#f5f7ee; --bg:#f1f3f6; --surface:#ffffff; --ink:#1b2027; --muted:#66707b; --line:#dde2e8;
+  --accent:#ffe9a6; --accent-ink:#4a3712; --danger:#c0392b;
+  --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC","Segoe UI",sans-serif;
+  --r:12px; color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+html{background:var(--page)}
+body{
+  min-height:100vh;color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;
+  background-color:var(--page);
+  background-image:
+    radial-gradient(45vw 45vh at 4% 4%, rgba(248,190,206,.78), transparent 70%),
+    radial-gradient(40vw 40vh at 50% 0%, rgba(255,214,186,.70), transparent 70%),
+    radial-gradient(45vw 50vh at 98% 6%, rgba(218,200,246,.78), transparent 70%),
+    radial-gradient(40vw 45vh at 100% 55%, rgba(190,224,186,.80), transparent 70%),
+    radial-gradient(45vw 45vh at 60% 100%, rgba(250,196,214,.65), transparent 70%),
+    radial-gradient(45vw 45vh at 92% 98%, rgba(164,210,162,.75), transparent 70%),
+    radial-gradient(45vw 50vh at 0% 60%, rgba(206,232,198,.70), transparent 70%),
+    radial-gradient(45vw 45vh at 4% 98%, rgba(255,232,170,.80), transparent 70%);
+  background-attachment:fixed;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 60px;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 14px}
+.brand{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px}
+h1{font-size:24px;margin:0;font-weight:800;letter-spacing:.02em}
+h1 mark{background:var(--accent);color:var(--accent-ink);padding:2px 12px;border-radius:12px}
+.tagline{margin:0;color:var(--muted);font-size:13px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);gap:16px;align-items:start}
+@media (max-width:860px){.cols{grid-template-columns:minmax(0,1fr)}}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.card{background:var(--surface);border:1px solid rgba(255,255,255,.9);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0;box-shadow:0 1px 2px rgba(40,30,60,.05),0 10px 28px rgba(50,80,40,.09)}
+h2{font-size:15px;margin:0;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+h2 small{font-weight:400;color:var(--muted);font-size:13px}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 12px;min-height:34px}
+button:hover{border-color:var(--ink)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+button.small{padding:3px 9px;min-height:28px;font-size:13px}
+button.danger{color:var(--danger)}
+button.ghost{border-style:dashed}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+input[type=text],input[type=number],textarea{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px}
+textarea{resize:vertical;min-height:64px}
+label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.row>label{flex:1 1 120px}
+.note{font-size:13px;color:var(--muted);margin:0}
+.status{font-size:13px;color:var(--muted)}
+.lang,.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.lang button,.seg button{border:none;border-radius:0;background:var(--bg);font-size:13px;min-height:32px}
+.seg button{flex:1}
+.lang button[aria-pressed=true],.seg button[aria-pressed=true]{background:var(--ink);color:var(--surface);font-weight:700}
+.pick{position:relative;border:1.5px dashed var(--muted);border-radius:8px;padding:12px;text-align:center;cursor:pointer;color:var(--ink);font-size:14px}
+.pick:hover{border-color:var(--ink)}
+.pick input{position:absolute;opacity:0;width:1px;height:1px}
+.pick:focus-within{outline:2px solid var(--ink);outline-offset:2px}
+.thumbs{display:flex;gap:6px;flex-wrap:wrap}
+.thumb{position:relative;width:64px;height:64px;border-radius:6px;overflow:hidden;border:1px solid var(--line);background:var(--bg);flex:none}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb button{position:absolute;top:2px;right:2px;min-height:0;width:20px;height:20px;padding:0;border-radius:50%;line-height:1;font-size:13px;background:rgba(0,0,0,.65);color:#fff;border:none}
+.item .thumb{width:48px;height:48px}
+.list{display:flex;flex-direction:column;gap:8px}
+.item{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.item.on{border-color:var(--gc,var(--ink));box-shadow:inset 5px 0 0 var(--gc,var(--accent))}
+.item.sold{opacity:.55}
+.item input[type=checkbox]{width:22px;height:22px;margin:2px 0 0;accent-color:var(--ink)}
+.item .body{display:flex;flex-direction:column;gap:6px;min-width:0}
+.item .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.price{font-weight:800;font-size:16px;font-variant-numeric:tabular-nums}
+.desc{font-size:13px;overflow-wrap:anywhere;white-space:pre-wrap}
+.desc .alt{display:block;color:var(--muted);font-size:12px}
+.pill{font-size:11px;padding:1px 7px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.pill.sold{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.pill.warn{border-color:#d08a1a;color:#a8670a}
+.tag{display:inline-flex;align-items:center;font-size:12px;font-weight:700;color:#fff;background:var(--gc,#888);padding:1px 8px;border-radius:99px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.acts{display:flex;gap:6px;flex-wrap:wrap}
+.banner{font-size:13px;background:var(--bg);border-radius:8px;padding:8px 10px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.out{display:flex;flex-direction:column;gap:14px}
+.shot{display:flex;flex-direction:column;gap:8px;border-left:5px solid var(--gc,#888);padding-left:10px}
+.shot .meta{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px}
+.shot .meta .info{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.shot .meta b{font-variant-numeric:tabular-nums}
+.shot .names{font-size:13px;color:var(--muted)}
+.scroll{max-height:70vh;overflow-y:auto;border-radius:6px;border:1px solid var(--line);background:#fff}
+.scroll img{max-width:100%;display:block}
+.check{flex-direction:row;align-items:center;gap:6px;color:var(--ink);font-size:14px}
+.check input{width:18px;height:18px;accent-color:var(--ink)}
+.empty{font-size:13px;color:var(--muted);margin:0}
+[hidden]{display:none!important}
+.row.top{align-items:flex-start}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tabs .tab{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:4px 10px;min-height:30px;border-radius:99px;background:var(--surface)}
+.tabs .tab i{width:10px;height:10px;border-radius:50%;background:var(--gc);display:inline-block}
+.tabs .tab[aria-pressed=true]{border-color:var(--gc);box-shadow:inset 0 0 0 1px var(--gc);font-weight:700;background:color-mix(in srgb, var(--gc) 10%, #fff)}
+.groupbar{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;padding:10px;border-radius:8px;background:var(--bg);border-left:5px solid var(--gc,#888)}
+.groupbar label{flex:1 1 180px}
+.groupbar input[type=text]{background:#fff}
+.tags{display:flex;gap:4px;flex-wrap:wrap}
+.tag.dim{opacity:.45}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><mark id="tTitle">二手长图拼接</mark></h1>
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" data-lang="zh" aria-pressed="true">中文</button>
+      <button type="button" data-lang="en" aria-pressed="false">EN</button>
+    </div>
+  </header>
+
+  <div class="cols">
+    <div class="col">
+      <section class="card" id="editor">
+        <h2 id="edTitle"></h2>
+        <label class="pick" for="files"><input type="file" id="files" accept="image/*" multiple><span id="tPick"></span></label>
+        <div class="thumbs" id="edThumbs"></div>
+        <div class="row top">
+          <label for="price" style="flex:0 1 130px"><span id="tPrice"></span><input type="text" id="price" placeholder="20" autocomplete="off"></label>
+          <label for="desc" style="flex:3 1 230px"><span id="tDesc"></span><textarea id="desc" rows="2"></textarea></label>
+        </div>
+        <div class="row" style="align-items:center">
+          <button class="primary" id="saveBtn" type="button"></button>
+          <button id="cancelBtn" type="button" class="ghost" hidden></button>
+          <span class="status" id="edMsg" role="status"></span>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2><span id="tList"></span> <small id="count"></small></h2>
+        <div class="banner" id="exBanner" hidden><span id="tEx"></span><button class="small" id="clearEx" type="button"></button></div>
+        <div class="tabs" id="tabs" role="group"></div>
+        <div class="groupbar" id="groupbar">
+          <label for="gname"><span id="tGName"></span><input type="text" id="gname" autocomplete="off"></label>
+          <button class="small" id="selAll" type="button"></button>
+          <button class="small" id="selNone" type="button"></button>
+          <button class="small danger" id="delGroup" type="button"></button>
+        </div>
+        <div class="acts"><button class="small ghost" id="fillTr" type="button" hidden></button></div>
+        <div class="list" id="list"></div>
+        <p class="note" id="storeNote"></p>
+        <p class="note" id="trNote" hidden></p>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="card">
+        <h2><span id="tOut"></span> <small id="genInfo"></small></h2>
+        <div class="seg" role="group" id="segQ">
+          <button type="button" data-q="s" aria-pressed="false"></button>
+          <button type="button" data-q="m" aria-pressed="true"></button>
+          <button type="button" data-q="l" aria-pressed="false"></button>
+        </div>
+        <div class="row">
+          <label for="cur"><span id="tCur"></span><input type="text" id="cur" value="$" maxlength="3"></label>
+        </div>
+        <label class="check" for="num"><input type="checkbox" id="num" checked><span id="tNum"></span></label>
+        <div class="out" id="out"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+
+/* ---------- 文案 ---------- */
+const T = {
+  zh:{
+    title:'二手长图拼接', add:'添加物品', edit:'编辑物品', pick:'选择照片', price:'价格', desc:'描述', descPh:'宜家台灯，九成新，带灯泡，自取',
+    save:'保存到清单', saveEdit:'保存修改', cancel:'取消编辑',
+    needPhoto:'先选至少一张照片。', compress:'正在压缩照片…', badPhoto:'有一张照片读不出来，换成 JPG 或 PNG 再试。', saved:'已保存 ✓',
+    list:'物品清单', ex:'下面是示例物品，方便你先看效果。', clearEx:'清除示例',
+    newImg:'+ 新建长图', gname:'长图名称（可选）', gnamePh:'例如：家具', defName:n=>`长图 ${n}`, delGroup:'删除这张长图', delGroupConfirm:'再点一次确认',
+    selAll:'全选在售', selNone:'全不选', none:'还没有物品', count:(l,o)=>`在售 ${l} 件 · 这张长图选了 ${o} 件`,
+    noPrice:'未标价', sold:'已售', example:'示例', markSold:'标记已售', unsold:'恢复在售', editBtn:'编辑', up:'上移', down:'下移', del:'删除', delConfirm:'再点一次确认',
+    storeOk:'照片和信息存在这台设备的这个浏览器里，下次打开还在。换设备或清除浏览器数据后需要重新上传。',
+    storeNo:'这个浏览器不允许保存数据，关闭页面后清单会清空。',
+    out:'长图', qs:'最小', qm:'均衡', ql:'清晰', cur:'货币符号', num:'给物品编号（买家可以直接说「要 3 号」）',
+    generating:'生成中…', genFail:'生成失败：有照片损坏，删掉那件物品重新上传。',
+    info:(k,s)=>`${k} 张 · 共 ${s}`, items:n=>`${n} 件`, no:n=>`${n} 号`,
+    saveImg:'保存图片', savedImg:'已保存', saveFail:'保存不了，请长按图片',
+    translating:'翻译中…', untranslated:'还没翻译', translate:'翻译', fill:n=>`补全翻译（${n} 件）`,
+    trFail:'翻译没成功，稍后点「翻译」再试。', trOff:'这里用不了自动翻译，另一种语言会先显示原文。',
+    item:'物品', aria:n=>`放进「${n}」`, rm:'移除这张照片', photo:'物品照片', fileBase:'二手长图'
+  },
+  en:{
+    title:'Yard Sale Long Pic', add:'Add an item', edit:'Edit item', pick:'Choose photos', price:'Price', desc:'Description', descPh:'IKEA desk lamp, like new, bulb included, pickup only',
+    save:'Save to list', saveEdit:'Save changes', cancel:'Cancel',
+    needPhoto:'Choose at least one photo first.', compress:'Compressing photos…', badPhoto:'One photo could not be read. Try a JPG or PNG.', saved:'Saved ✓',
+    list:'Item list', ex:'These are sample items so you can see how it works.', clearEx:'Remove samples',
+    newImg:'+ New long image', gname:'Image name (optional)', gnamePh:'e.g. Furniture', defName:n=>`Image ${n}`, delGroup:'Delete this image', delGroupConfirm:'Tap again to delete',
+    selAll:'Select all for sale', selNone:'Select none', none:'No items yet', count:(l,o)=>`${l} for sale · ${o} in this image`,
+    noPrice:'No price', sold:'Sold', example:'Sample', markSold:'Mark sold', unsold:'Back for sale', editBtn:'Edit', up:'Up', down:'Down', del:'Delete', delConfirm:'Tap again to delete',
+    storeOk:'Photos and details are saved in this browser on this device and will be here next time. On another device, or after clearing browser data, upload again.',
+    storeNo:'This browser blocks saving, so the list clears when you close the page.',
+    out:'Long images', qs:'Smallest', qm:'Balanced', ql:'Sharp', cur:'Currency', num:'Number the items (buyers can say “I want #3”)',
+    generating:'Building…', genFail:'Could not build: a photo is damaged. Delete that item and upload it again.',
+    info:(k,s)=>`${k} image${k>1?'s':''} · ${s} total`, items:n=>`${n} item${n>1?'s':''}`, no:n=>`#${n}`,
+    saveImg:'Save image', savedImg:'Saved', saveFail:'Could not save. Long-press the image instead.',
+    translating:'Translating…', untranslated:'Not translated', translate:'Translate', fill:n=>`Translate missing (${n})`,
+    trFail:'Translation failed. Tap “Translate” to try again later.', trOff:'Auto-translate is not available here, so the other language shows the original text for now.',
+    item:'Item', aria:n=>`Include in “${n}”`, rm:'Remove this photo', photo:'Item photo', fileBase:'yard-sale'
+  }
+};
+let lang = 'zh';
+const t = k => T[lang][k];
+const other = l => l === 'zh' ? 'en' : 'zh';
+
+function applyLang(){
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  const set = (id, k) => { $(id).textContent = t(k); };
+  set('tTitle','title'); set('tPick','pick'); set('tPrice','price'); set('tDesc','desc');
+  set('cancelBtn','cancel'); set('tList','list'); set('tEx','ex'); set('clearEx','clearEx'); set('selAll','selAll'); set('selNone','selNone');
+  set('tGName','gname'); set('delGroup','delGroup'); set('tOut','out'); set('tCur','cur'); set('tNum','num');
+  $('desc').placeholder = t('descPh'); $('gname').placeholder = t('gnamePh');
+  document.querySelector('[data-q=s]').textContent = t('qs');
+  document.querySelector('[data-q=m]').textContent = t('qm');
+  document.querySelector('[data-q=l]').textContent = t('ql');
+  document.querySelectorAll('.lang button').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === lang));
+  $('edTitle').textContent = draft.id ? t('edit') : t('add');
+  $('saveBtn').textContent = draft.id ? t('saveEdit') : t('save');
+  if(draft.id){ const it = items.find(x => x.id === draft.id); if(it && !$('desc').dataset.dirty){ $('desc').value = descOf(it); draft.shown = $('desc').value; } }
+  showStore();
+}
+
+/* ---------- 存储 ---------- */
+const PRESETS = { s:{w:720,q:.55}, m:{w:1080,q:.68}, l:{w:1440,q:.8} };
+const MAX_AREA = 15.5e6, IMPORT_MAX = 1600, GROUPS_KEY = '__groups';
+let db = null, memory = new Map(), persistent = false;
+function openDB(){
+  return new Promise(res => {
+    try{
+      const r = indexedDB.open('longpic', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('items', {keyPath:'id'});
+      r.onsuccess = () => res(r.result); r.onerror = () => res(null); r.onblocked = () => res(null);
+    }catch(e){ res(null); }
+  });
+}
+function tx(mode, fn){
+  return new Promise((res, rej) => {
+    try{ const x = db.transaction('items', mode), rq = fn(x.objectStore('items'));
+      x.oncomplete = () => res(rq && rq.result); x.onerror = x.onabort = () => rej(x.error); }catch(e){ rej(e); }
+  });
+}
+async function dbAll(){ if(db){ try{ return await tx('readonly', s => s.getAll()); }catch(e){ db = null; } } return [...memory.values()]; }
+async function putRaw(rec){
+  if(db){ try{ await tx('readwrite', s => s.put(rec)); return; }catch(e){ db = null; persistent = false; showStore(); } }
+  memory.set(rec.id, rec);
+}
+const dbPut = it => putRaw({id:it.id, price:it.price, zh:it.zh||'', en:it.en||'', src:it.src||'', sold:it.sold, order:it.order, example:!!it.example, photos:it.photos});
+const saveGroups = () => putRaw({id:GROUPS_KEY, groups:groups.map(g => ({id:g.id, name:g.name, ids:[...g.ids]})), active});
+async function dbDel(id){ if(db){ try{ await tx('readwrite', s => s.delete(id)); return; }catch(e){ db = null; } } memory.delete(id); }
+function showStore(){ $('storeNote').textContent = persistent ? t('storeOk') : t('storeNo'); }
+
+/* ---------- 状态与工具 ---------- */
+let items = [], groups = [], active = null;
+let draft = {id:null, photos:[], shown:''}, preset = 'm';
+const translating = new Set();
+let sample = null, sampleDead = false, downloads = null;
+/* 独立使用（不在 Claude 里打开）：直接下载文件，翻译用免费的 MyMemory 接口 */
+const STANDALONE = !(window.claude && window.claude.use);
+const webTr = STANDALONE && typeof fetch === 'function';
+const canTr = () => (sample || webTr) && !sampleDead;
+if(STANDALONE){
+  downloads = { save: ({filename, data}) => new Promise(res => {
+    const u = URL.createObjectURL(data), a = document.createElement('a');
+    a.href = u; a.download = filename; document.body.append(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(u); a.remove(); }, 4000); res({status:'saved'});
+  })};
+}
+async function webTranslate(text, to){
+  const pair = to === 'zh' ? 'en|zh-CN' : 'zh-CN|en';
+  const r = await fetch('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(text.slice(0, 480)) + '&langpair=' + pair);
+  if(!r.ok) throw new Error('http ' + r.status);
+  const j = await r.json();
+  const out = j && j.responseData && j.responseData.translatedText;
+  if(Number(j.responseStatus) !== 200 || !out || /MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(out)) throw new Error('limit');
+  const el = document.createElement('textarea'); el.innerHTML = out; return el.value.trim();   // 解码 HTML 实体
+}
+const urlOf = new WeakMap(), imgOf = new WeakMap();
+const url = b => { let u = urlOf.get(b); if(!u){ u = URL.createObjectURL(b); urlOf.set(b,u); } return u; };
+function loadImg(b){
+  let p = imgOf.get(b);
+  if(!p){ p = new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url(b); }); imgOf.set(b,p); }
+  return p;
+}
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const fmtPrice = p => { p = (p||'').trim(); if(!p) return ''; return /^[\d.]/.test(p) ? ($('cur').value.trim() + p) : p; };
+const kb = n => n >= 1048576 ? (n/1048576).toFixed(2)+' MB' : Math.max(1,Math.round(n/1024))+' KB';
+function detect(s){
+  const cjk = (s.match(/[㐀-鿿豈-﫿]/g) || []).length, lat = (s.match(/[A-Za-z]/g) || []).length;
+  return cjk > 0 && cjk*3 >= lat ? 'zh' : 'en';
+}
+const descOf = it => (it[lang] || it[other(lang)] || '').trim();
+const missing = it => [it.zh, it.en].filter(x => x && x.trim()).length === 1;
+
+/* ---------- 长图（分组） ---------- */
+const GROUP_COLORS = ['#2f6fde','#1f9d6a','#e0761b','#b0429e','#0f8fa8','#c43d3d','#6a5acd','#8a6d1f'];
+const gIndex = g => groups.indexOf(g);
+const gColor = g => GROUP_COLORS[gIndex(g) % GROUP_COLORS.length];
+const gName = g => (g.name || '').trim() || t('defName')(gIndex(g) + 1);
+const activeGroup = () => groups.find(g => g.id === active) || null;
+const members = g => items.filter(it => g.ids.has(it.id) && !it.sold);   // 按清单顺序，跳过已售
+function newGroup(){
+  const g = {id:uid(), name:'', ids:new Set()}; groups.push(g); active = g.id; saveGroups(); return g;
+}
+function renderTabs(){
+  const box = $('tabs'); box.textContent = '';
+  groups.forEach(g => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'tab';
+    b.style.setProperty('--gc', gColor(g)); b.setAttribute('aria-pressed', g.id === active);
+    const dot = document.createElement('i'); b.append(dot, `${gName(g)} · ${members(g).length}`);
+    b.onclick = () => { active = g.id; saveGroups(); renderAll(); };
+    box.append(b);
+  });
+  const add = document.createElement('button'); add.type = 'button'; add.className = 'small ghost'; add.textContent = t('newImg');
+  add.onclick = () => { newGroup(); renderAll(); schedule(); $('gname').focus(); };
+  box.append(add);
+  const g = activeGroup();
+  $('groupbar').hidden = !g;
+  if(g){
+    $('groupbar').style.setProperty('--gc', gColor(g));
+    if(document.activeElement !== $('gname')) $('gname').value = g.name || '';
+  }
+}
+$('gname').addEventListener('input', () => {
+  const g = activeGroup(); if(!g) return; g.name = $('gname').value; saveGroups(); renderTabs(); renderList(); schedule();
+});
+$('delGroup').onclick = () => {
+  const b = $('delGroup'), g = activeGroup(); if(!g) return;
+  if(!b.dataset.arm){ b.dataset.arm = '1'; b.textContent = t('delGroupConfirm'); setTimeout(() => { delete b.dataset.arm; b.textContent = t('delGroup'); }, 3000); return; }
+  delete b.dataset.arm; b.textContent = t('delGroup');
+  groups = groups.filter(x => x !== g); active = groups.length ? groups[groups.length-1].id : null;
+  saveGroups(); renderAll(); schedule();
+};
+async function setAll(v){
+  const g = activeGroup(); if(!g) return;
+  for(const it of items){ if(it.sold) continue; if(v) g.ids.add(it.id); else g.ids.delete(it.id); }
+  saveGroups(); renderAll(); schedule();
+}
+$('selAll').onclick = () => setAll(true);
+$('selNone').onclick = () => setAll(false);
+
+/* ---------- 翻译（通过 Claude） ---------- */
+async function translateItems(list){
+  if(!canTr() || !list.length) return;
+  const jobs = list.map(it => { const src = (it.zh||'').trim() && !(it.en||'').trim() ? 'zh' : 'en'; return {it, src, to:other(src)}; })
+                  .filter(j => (j.it[j.src]||'').trim());
+  if(!jobs.length) return;
+  jobs.forEach(j => translating.add(j.it.id)); renderList(); $('trNote').hidden = true;
+  const payload = jobs.map((j,i) => ({i, to: j.to === 'zh' ? 'Simplified Chinese' : 'English', text: j.it[j.src]}));
+  const prompt = 'You translate short second-hand marketplace listings (item descriptions). For each entry, translate "text" into the language in "to". ' +
+    'Keep it natural and concise like a real listing; keep numbers, sizes, units and brand names; do not add information. ' +
+    'Reply with only a JSON array like [{"i":0,"text":"..."}].\n\n' + JSON.stringify(payload);
+  if(!sample){
+    let failed = false;
+    for(const j of jobs){
+      try{ j.it[j.to] = await webTranslate(j.it[j.src], j.to); await dbPut(j.it); }catch(e){ failed = true; }
+    }
+    if(failed){ $('trNote').textContent = t('trFail'); $('trNote').hidden = false; }
+    jobs.forEach(j => translating.delete(j.it.id));
+    renderList(); schedule(); return;
+  }
+  try{
+    const out = await sample.json(prompt, {modelTier:'quick'});
+    if(Array.isArray(out)) for(const r of out){
+      const j = jobs[Number(r && r.i)]; if(j && r && typeof r.text === 'string' && r.text.trim()){ j.it[j.to] = r.text.trim(); await dbPut(j.it); }
+    }
+  }catch(e){
+    const c = e && e.code;
+    if(['not_granted','sampling_disabled','not_declared','capability_disabled','capability_removed'].includes(c)){ sampleDead = true; $('trNote').textContent = t('trOff'); }
+    else $('trNote').textContent = t('trFail');
+    $('trNote').hidden = false;
+  }
+  jobs.forEach(j => translating.delete(j.it.id));
+  renderList(); schedule();
+}
+$('fillTr').onclick = () => translateItems(items.filter(missing));
+
+/* ---------- 导入照片 ---------- */
+async function shrink(file){
+  let src;
+  try{ src = await createImageBitmap(file, {imageOrientation:'from-image'}); }
+  catch(e){ src = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(file); }); }
+  const sw = src.width, sh = src.height, k = Math.min(1, IMPORT_MAX/Math.max(sw,sh));
+  const c = document.createElement('canvas'); c.width = Math.round(sw*k); c.height = Math.round(sh*k);
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(src,0,0,c.width,c.height);
+  if(src.close) src.close();
+  return await new Promise(res => c.toBlob(res, 'image/jpeg', .85));
+}
+
+/* ---------- 编辑区 ---------- */
+function thumbEl(blob, onRemove){
+  const d = document.createElement('div'); d.className = 'thumb';
+  const im = document.createElement('img'); im.src = url(blob); im.alt = t('photo'); d.append(im);
+  if(onRemove){ const b = document.createElement('button'); b.type='button'; b.textContent='×'; b.setAttribute('aria-label', t('rm')); b.onclick = onRemove; d.append(b); }
+  return d;
+}
+function renderDraft(){
+  const box = $('edThumbs'); box.textContent = '';
+  draft.photos.forEach((b,i) => box.append(thumbEl(b, () => { draft.photos.splice(i,1); renderDraft(); })));
+}
+$('desc').addEventListener('input', () => { $('desc').dataset.dirty = '1'; });
+$('files').addEventListener('change', async e => {
+  const fs = [...e.target.files]; e.target.value = '';
+  $('edMsg').textContent = t('compress'); let bad = false;
+  for(const f of fs){ try{ const b = await shrink(f); if(b) draft.photos.push(b); }catch(err){ bad = true; } }
+  $('edMsg').textContent = bad ? t('badPhoto') : '';
+  renderDraft();
+});
+function resetEditor(){
+  draft = {id:null, photos:[], shown:''}; $('price').value=''; $('desc').value=''; delete $('desc').dataset.dirty;
+  $('edTitle').textContent = t('add'); $('saveBtn').textContent = t('save'); $('cancelBtn').hidden = true; renderDraft();
+}
+$('cancelBtn').onclick = resetEditor;
+$('saveBtn').onclick = async () => {
+  if(!draft.photos.length){ $('edMsg').textContent = t('needPhoto'); return; }
+  const text = $('desc').value.trim();
+  let it = draft.id && items.find(x => x.id === draft.id), needTr = false;
+  if(it){
+    it.photos = draft.photos.slice(); it.price = $('price').value;
+    if(text !== (draft.shown||'').trim()){
+      if(text){ const s = detect(text); it[s] = text; it[other(s)] = ''; it.src = s; needTr = true; }
+      else { it.zh = ''; it.en = ''; }
+    }
+  }else{
+    it = {id:uid(), price:$('price').value, zh:'', en:'', photos:draft.photos.slice(), sold:false,
+          order:(items.length ? Math.max(...items.map(x => x.order)) : 0) + 1};
+    if(text){ const s = detect(text); it[s] = text; it.src = s; needTr = true; }
+    items.push(it);
+    const g = activeGroup(); if(g){ g.ids.add(it.id); saveGroups(); }      // 新物品放进当前长图
+  }
+  await dbPut(it);
+  $('edMsg').textContent = t('saved'); setTimeout(() => { if($('edMsg').textContent === t('saved')) $('edMsg').textContent = ''; }, 1600);
+  resetEditor(); renderAll(); schedule();
+  if(needTr) translateItems([it]);
+};
+function editItem(it){
+  draft = {id:it.id, photos:it.photos.slice(), shown:descOf(it)}; $('price').value = it.price; $('desc').value = draft.shown; delete $('desc').dataset.dirty;
+  $('edTitle').textContent = t('edit'); $('saveBtn').textContent = t('saveEdit'); $('cancelBtn').hidden = false; renderDraft();
+  $('editor').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+/* ---------- 清单 ---------- */
+function btn(text, cls, fn){ const b = document.createElement('button'); b.type='button'; b.className='small '+(cls||''); b.textContent=text; b.onclick=fn; return b; }
+function renderList(){
+  items.sort((a,b) => a.order - b.order);
+  const list = $('list'); list.textContent = '';
+  const g = activeGroup();
+  const pos = new Map(groups.map(gr => [gr, new Map(members(gr).map((it,i) => [it.id, i+1]))]));
+  items.forEach((it, idx) => {
+    const inActive = !!(g && g.ids.has(it.id) && !it.sold);
+    const row = document.createElement('div'); row.className = 'item' + (inActive ? ' on' : '') + (it.sold ? ' sold' : '');
+    if(g) row.style.setProperty('--gc', gColor(g));
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'cb_'+it.id; cb.checked = inActive; cb.disabled = it.sold || !g;
+    if(g) cb.setAttribute('aria-label', t('aria')(gName(g)));
+    cb.onchange = () => { if(!g) return; if(cb.checked) g.ids.add(it.id); else g.ids.delete(it.id); saveGroups(); renderAll(); schedule(); };
+    const body = document.createElement('div'); body.className = 'body';
+    const top = document.createElement('div'); top.className = 'top';
+    const pr = document.createElement('span'); pr.className = 'price'; pr.textContent = fmtPrice(it.price) || t('noPrice'); top.append(pr);
+    if(it.sold){ const p = document.createElement('span'); p.className = 'pill sold'; p.textContent = t('sold'); top.append(p); }
+    if(it.example){ const p = document.createElement('span'); p.className = 'pill'; p.textContent = t('example'); top.append(p); }
+    if(translating.has(it.id)){ const p = document.createElement('span'); p.className = 'pill'; p.textContent = t('translating'); top.append(p); }
+    else if(missing(it) && !(it[lang]||'').trim()){ const p = document.createElement('span'); p.className = 'pill warn'; p.textContent = t('untranslated'); top.append(p); }
+    const tags = document.createElement('div'); tags.className = 'tags';
+    groups.forEach(gr => {
+      const n = pos.get(gr).get(it.id); if(!n) return;
+      const tg = document.createElement('span'); tg.className = 'tag' + (gr === g ? '' : ' dim'); tg.style.setProperty('--gc', gColor(gr));
+      tg.textContent = `${gName(gr)} · ${t('no')(n)}`; tags.append(tg);
+    });
+    const ds = document.createElement('div'); ds.className = 'desc'; ds.textContent = descOf(it);
+    const alt = (it[other(lang)]||'').trim();
+    if(alt && (it[lang]||'').trim()){ const s = document.createElement('span'); s.className = 'alt'; s.textContent = alt; ds.append(s); }
+    const th = document.createElement('div'); th.className = 'thumbs'; it.photos.forEach(b => th.append(thumbEl(b)));
+    const acts = document.createElement('div'); acts.className = 'acts';
+    acts.append(
+      btn(it.sold ? t('unsold') : t('markSold'), '', async () => { it.sold = !it.sold; await dbPut(it); renderAll(); schedule(); }),
+      btn(t('editBtn'), '', () => editItem(it)),
+      btn(t('up'), '', () => move(idx,-1)), btn(t('down'), '', () => move(idx,1))
+    );
+    if(missing(it) && canTr() && !translating.has(it.id)) acts.append(btn(t('translate'), 'ghost', () => translateItems([it])));
+    const del = btn(t('del'), 'danger', async () => {
+      if(del.dataset.arm){
+        items = items.filter(x => x !== it); groups.forEach(gr => gr.ids.delete(it.id)); saveGroups();
+        await dbDel(it.id); if(draft.id === it.id) resetEditor(); renderAll(); schedule();
+      }else{ del.dataset.arm = '1'; del.textContent = t('delConfirm'); setTimeout(() => { delete del.dataset.arm; del.textContent = t('del'); }, 3000); }
+    });
+    acts.append(del);
+    body.append(top);
+    if(tags.childNodes.length) body.append(tags);
+    body.append(ds, th, acts); row.append(cb, body); list.append(row);
+  });
+  const live = items.filter(x => !x.sold);
+  $('count').textContent = items.length ? t('count')(live.length, g ? members(g).length : 0) : t('none');
+  $('exBanner').hidden = !items.some(x => x.example);
+  const miss = items.filter(x => missing(x) && !translating.has(x.id)).length;
+  $('fillTr').hidden = !(canTr() && miss > 1);
+  $('fillTr').textContent = t('fill')(miss);
+}
+function renderAll(){ renderTabs(); renderList(); }
+async function move(i, d){
+  const j = i + d; if(j < 0 || j >= items.length) return;
+  const a = items[i], b = items[j], tmp = a.order; a.order = b.order; b.order = tmp;
+  await dbPut(a); await dbPut(b); renderAll(); schedule();
+}
+$('clearEx').onclick = async () => {
+  for(const it of items.filter(x => x.example)){ await dbDel(it.id); groups.forEach(g => g.ids.delete(it.id)); }
+  items = items.filter(x => !x.example); saveGroups(); renderAll(); schedule();
+};
+
+/* ---------- 长图排版 ---------- */
+function splitRows(n){
+  if(n <= 3) return [n]; if(n === 4) return [2,2];
+  const r = []; while(n > 0){ if(n === 4){ r.push(2,2); break; } r.push(Math.min(3,n)); n -= 3; } return r;
+}
+function wrap(g, text, maxW){
+  const lines = [];
+  for(const para of String(text).split(/\n/)){
+    const toks = para.match(/[A-Za-z0-9$¥€£.,:;!?%#@&()\-+/'"]+|\s+|./gu) || [];
+    let cur = '';
+    for(const tk of toks){
+      if(g.measureText(cur + tk).width <= maxW){ cur += tk; continue; }
+      if(cur.trim()) lines.push(cur.trimEnd());
+      cur = tk.trim() ? tk : '';
+      while(g.measureText(cur).width > maxW && cur.length > 1){
+        let k = cur.length - 1; while(k > 1 && g.measureText(cur.slice(0,k)).width > maxW) k--;
+        lines.push(cur.slice(0,k)); cur = cur.slice(k);
+      }
+    }
+    if(cur.trim()) lines.push(cur.trimEnd());
+  }
+  return lines;
+}
+const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif';
+function layout(g, group, W, numbered){
+  const P = Math.round(W*.035), gap = Math.round(W*.012), sep = Math.round(W*.075);
+  const fs1 = Math.round(W*.054), fs2 = Math.round(W*.037), inner = W - 2*P, ops = [];
+  let y = P;
+  group.forEach((it, i) => {
+    let k = 0;
+    for(const n of splitRows(it.imgs.length)){
+      const row = it.imgs.slice(k, k+n); k += n;
+      const sum = row.reduce((s,im) => s + im.naturalWidth/im.naturalHeight, 0);
+      let h = (inner - gap*(n-1)) / sum, x = P;
+      const hMax = W*1.05;
+      if(h > hMax){ h = hMax; x = P + (inner - (sum*h + gap*(n-1)))/2; }
+      h = Math.round(h);
+      row.forEach((im, j) => {
+        const r = im.naturalWidth/im.naturalHeight;
+        const w = j === n-1 && x + r*h > W - P - 2 ? (W - P - x) : Math.round(r*h);
+        ops.push({im, x:Math.round(x), y, w, h}); x += w + gap;
+      });
+      y += h + gap;
+    }
+    y += Math.round(fs1*.35);
+    const head = [numbered ? (i+1)+'.' : '', fmtPrice(it.price)].filter(Boolean).join(' ');
+    if(head){ g.font = `800 ${fs1}px ${FONT}`; for(const ln of wrap(g, head, inner)){ ops.push({text:ln, font:g.font, x:P, y:y + fs1}); y += Math.round(fs1*1.3); } }
+    const d = descOf(it);
+    if(d){ g.font = `400 ${fs2}px ${FONT}`; for(const ln of wrap(g, d, inner)){ ops.push({text:ln, font:g.font, x:P, y:y + fs2}); y += Math.round(fs2*1.45); } }
+    y += i < group.length-1 ? sep : P;
+  });
+  return {H:Math.ceil(y), ops};
+}
+async function build(group){
+  const pr = PRESETS[preset], numbered = $('num').checked;
+  for(const it of group) it.imgs = await Promise.all(it.photos.map(loadImg));
+  const c = document.createElement('canvas'), g = c.getContext('2d');
+  let W = pr.w, L = layout(g, group, W, numbered);
+  if(W*L.H > MAX_AREA){ W = Math.floor(W*Math.sqrt(MAX_AREA/(W*L.H))*.98); L = layout(g, group, W, numbered); }
+  c.width = W; c.height = L.H;
+  g.fillStyle = '#fff'; g.fillRect(0,0,W,L.H);
+  g.imageSmoothingQuality = 'high'; g.textBaseline = 'alphabetic';
+  for(const o of L.ops){
+    if(o.im) g.drawImage(o.im, o.x, o.y, o.w, o.h);
+    else{ g.font = o.font; g.fillStyle = '#000'; g.fillText(o.text, o.x, o.y); }
+  }
+  const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', pr.q));
+  const out = {blob, W, H:L.H}; c.width = c.height = 1; return out;
+}
+
+/* ---------- 生成与保存 ---------- */
+let timer = 0, run = 0, liveUrls = [];
+function schedule(){ clearTimeout(timer); timer = setTimeout(generate, 250); }
+function shortName(it){
+  const s = descOf(it).split(/[，,。.;；\n]/)[0].trim();
+  return (s.length > 16 ? s.slice(0,15) + '…' : s) || fmtPrice(it.price) || t('item');
+}
+const safeFile = s => s.replace(/[\\/:*?"<>|]+/g, '').trim().slice(0, 60);
+async function generate(){
+  const my = ++run, out = $('out');
+  const todo = groups.map(g => ({g, list:members(g)})).filter(x => x.list.length);
+  if(!todo.length){ out.textContent = ''; $('genInfo').textContent = ''; return; }
+  $('genInfo').textContent = t('generating');
+  const results = [];
+  try{ for(const x of todo){ results.push({...x, r:await build(x.list)}); if(my !== run) return; } }
+  catch(e){ $('genInfo').textContent = t('genFail'); return; }
+  if(my !== run) return;
+  liveUrls.forEach(u => URL.revokeObjectURL(u)); liveUrls = [];
+  out.textContent = '';
+  results.forEach(({g, list, r}) => {
+    const u = URL.createObjectURL(r.blob); liveUrls.push(u);
+    const box = document.createElement('div'); box.className = 'shot'; box.style.setProperty('--gc', gColor(g));
+    const meta = document.createElement('div'); meta.className = 'meta';
+    const info = document.createElement('span'); info.className = 'info';
+    const tg = document.createElement('span'); tg.className = 'tag'; tg.style.setProperty('--gc', gColor(g)); tg.textContent = gName(g);
+    const b = document.createElement('b'); b.textContent = kb(r.blob.size);
+    info.append(tg, t('items')(list.length) + ' · ', b, ` · ${r.W}×${r.H}`);
+    meta.append(info);
+    if(downloads){
+      const s = btn(t('saveImg'), 'primary', async () => {
+        try{ await downloads.save({filename:(safeFile(gName(g)) || t('fileBase')) + '.jpg', data:r.blob}); s.textContent = t('savedImg'); }
+        catch(e){ s.textContent = e && e.code === 'declined' ? t('saveImg') : t('saveFail'); }
+      });
+      meta.append(s);
+    }
+    const names = document.createElement('div'); names.className = 'names';
+    names.textContent = list.map((it, k) => `${k+1}. ${shortName(it)}`).join('   ');
+    const sc = document.createElement('div'); sc.className = 'scroll';
+    const im = document.createElement('img'); im.src = u; im.alt = `${gName(g)} · ${t('items')(list.length)}`; sc.append(im);
+    box.append(meta, names, sc); out.append(box);
+  });
+  $('genInfo').textContent = t('info')(results.length, kb(results.reduce((s,x) => s + x.r.blob.size, 0)));
+}
+
+/* ---------- 设置 ---------- */
+const store = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
+document.querySelectorAll('#segQ button').forEach(b => b.onclick = () => {
+  preset = b.dataset.q; document.querySelectorAll('#segQ button').forEach(x => x.setAttribute('aria-pressed', x === b)); store('lp_preset', preset); schedule();
+});
+document.querySelectorAll('.lang button').forEach(b => b.onclick = () => {
+  if(lang === b.dataset.lang) return; lang = b.dataset.lang; store('lp_lang', lang); applyLang(); renderAll(); schedule();
+});
+['cur','num'].forEach(id => $(id).addEventListener('input', () => {
+  store('lp_'+id, id === 'num' ? ($(id).checked ? '1' : '0') : $(id).value);
+  if(id === 'cur') renderList(); schedule();
+}));
+
+/* ---------- 示例 ---------- */
+function fakePhoto(hue, shape, w, h){
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0,0,w,h); gr.addColorStop(0,`hsl(${hue} 30% 86%)`); gr.addColorStop(1,`hsl(${hue} 30% 68%)`);
+  g.fillStyle = gr; g.fillRect(0,0,w,h); g.fillStyle = `hsl(${hue} 35% 38%)`;
+  const cx = w/2, cy = h/2, s = Math.min(w,h)*.28;
+  if(shape === 0){ g.beginPath(); g.arc(cx,cy,s,0,7); g.fill(); }
+  else if(shape === 1){ g.fillRect(cx-s, cy-s*1.2, s*2, s*2.4); }
+  else{ g.beginPath(); g.moveTo(cx,cy-s*1.2); g.lineTo(cx+s*1.2,cy+s); g.lineTo(cx-s*1.2,cy+s); g.fill(); }
+  g.fillStyle = 'rgba(0,0,0,.5)'; g.font = `600 ${Math.round(w*.055)}px ${FONT}`; g.fillText('sample 示例', w*.05, h*.95);
+  return new Promise(res => c.toBlob(res, 'image/jpeg', .8));
+}
+async function seed(){
+  const defs = [
+    {price:'15', zh:'宜家台灯，九成新，带灯泡', en:'IKEA desk lamp, like new, bulb included', ph:[[40,2,600,800],[40,0,600,800]]},
+    {price:'40', zh:'五层书架，高 180cm，需自取', en:'5-shelf bookcase, 180 cm tall, pickup only', ph:[[200,1,800,600]]},
+    {price:'25', zh:'电饭煲 3L，用了一年，功能正常，内胆无划痕', en:'3L rice cooker, used for a year, works perfectly, no scratches inside', ph:[[340,0,700,700],[340,1,700,700],[340,2,700,700]]},
+  ];
+  let o = 1;
+  for(const d of defs){
+    const it = {id:uid(), price:d.price, zh:d.zh, en:d.en, src:'zh', sold:false, order:o++, example:true, photos:[]};
+    for(const p of d.ph) it.photos.push(await fakePhoto(...p));
+    items.push(it); await dbPut(it);
+  }
+}
+
+/* ---------- 启动 ---------- */
+(async () => {
+  try{
+    const l = localStorage.getItem('lp_lang'); if(l === 'zh' || l === 'en') lang = l;
+    const p = localStorage.getItem('lp_preset'); if(p && PRESETS[p]){ preset = p; document.querySelectorAll('#segQ button').forEach(x => x.setAttribute('aria-pressed', x.dataset.q === p)); }
+    const cur = localStorage.getItem('lp_cur'); if(cur !== null) $('cur').value = cur;
+    const num = localStorage.getItem('lp_num'); if(num !== null) $('num').checked = num === '1';
+  }catch(e){}
+  applyLang(); resetEditor();
+  db = await openDB(); persistent = !!db;
+  const all = await dbAll();
+  const gRec = all.find(x => x && x.id === GROUPS_KEY);
+  items = all.filter(x => x && x.id !== GROUPS_KEY && Array.isArray(x.photos) && x.photos.length);
+  for(const it of items){                         // 旧版本只有 desc 字段
+    if(it.desc && !it.zh && !it.en){ const s = detect(it.desc); it[s] = it.desc; it.src = s; delete it.desc; await dbPut(it); }
+  }
+  persistent = !!db; showStore();
+  let seeded = false; try{ seeded = localStorage.getItem('lp_seeded') === '1'; }catch(e){}
+  if(!items.length && !(persistent && seeded)){ await seed(); store('lp_seeded', '1'); }
+  items.sort((a,b) => a.order - b.order);
+  if(gRec && Array.isArray(gRec.groups)){
+    const ok = new Set(items.map(x => x.id));
+    groups = gRec.groups.map(g => ({id:g.id, name:g.name || '', ids:new Set((g.ids || []).filter(id => ok.has(id)))}));
+    active = groups.some(g => g.id === gRec.active) ? gRec.active : (groups[0] && groups[0].id) || null;
+  }else{
+    // 第一次用分组：把之前勾选的物品按每 10 件放进长图（旧版的 sel 字段）
+    const per = (() => { try{ return Math.min(20, Math.max(1, parseInt(localStorage.getItem('lp_per'),10) || 10)); }catch(e){ return 10; } })();
+    const chosen = items.filter(x => x.sel !== false && !x.sold);
+    for(let i = 0; i < chosen.length; i += per){ const g = newGroup(); chosen.slice(i, i+per).forEach(x => g.ids.add(x.id)); }
+    if(!groups.length) newGroup();
+    active = groups[0].id; saveGroups();
+  }
+  renderAll(); generate();
+  try{
+    if(!STANDALONE){
+      const [d, s] = await Promise.all([window.claude.use('downloads').catch(() => null), window.claude.use('sample').catch(() => null)]);
+      downloads = d; sample = s;
+      if(!sample){ $('trNote').textContent = t('trOff'); $('trNote').hidden = !items.some(missing); }
+      renderList(); if(downloads) generate();
+    }
+  }catch(e){}
+})();
+})();
+</script>
+</body>
+</html>
