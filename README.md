@@ -1,8 +1,21 @@
-# 二手长图拼接 · Yard Sale Long Pic
+# Yard Sale Long Pic
 
-把二手物品的照片拼成压缩过的长图，自动加上价格和描述，方便发到社交媒体。
+**Live site: https://tabbymao.github.io/secondhand-longpic/**
 
-- 照片只传一次，按需组合成多张长图，可命名
-- 卖掉的物品标记「已售」，长图自动重排
-- 中文 / English 切换，描述自动翻译
-- 所有照片和信息只存在你自己的浏览器里（IndexedDB），不会上传到任何服务器
+A small web tool for selling second-hand items. It combines your item photos into compressed long images, with the price and description added under each item, so they are quick to post and load on social media.
+
+## Features
+
+- Upload each item's photos once; several photos of one item sit side by side
+- Price and description are added automatically in black text on white
+- Create as many long images as you like, name them, and pick which items go in each
+- Mark an item as sold and it drops out of every long image automatically
+- Items are numbered so buyers can say "I want #3"
+- Three size presets (Smallest / Balanced / Sharp) to keep files small
+- Chinese / English interface; descriptions written in either language are auto-translated into the other
+
+## Privacy
+
+All photos and item details are stored only in your own browser (IndexedDB). Nothing is uploaded to a server. Each person who opens the site has their own separate list. Clearing your browser data, or switching to another device or browser, starts with an empty list.
+
+Auto-translation sends the description text (not photos) to the free [MyMemory](https://mymemory.translated.net/) translation service, which has a daily usage limit.
