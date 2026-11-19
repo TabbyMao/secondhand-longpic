@@ -177,6 +177,7 @@ label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4
         <div class="list" id="list"></div>
         <p class="note" id="storeNote"></p>
         <p class="note" id="trNote" hidden></p>
+        <p class="note" style="opacity:.6">v2026.11.19-2</p>
       </section>
     </div>
 
@@ -330,14 +331,30 @@ if(STANDALONE){
     setTimeout(() => { URL.revokeObjectURL(u); a.remove(); }, 4000); res({status:'saved'});
   })};
 }
-async function webTranslate(text, to){
+const looksTranslated = (out, to) => !!out && (to === 'en' ? ((out.match(/[㐀-鿿豈-﫿]/g) || []).length < 2) : /[㐀-鿿]/.test(out));
+async function myMemory(text, to){
   const pair = to === 'zh' ? 'en|zh-CN' : 'zh-CN|en';
   const r = await fetch('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(text.slice(0, 480)) + '&langpair=' + pair);
-  if(!r.ok) throw new Error('http ' + r.status);
+  if(!r.ok) throw new Error('mymemory http ' + r.status);
   const j = await r.json();
   const out = j && j.responseData && j.responseData.translatedText;
-  if(Number(j.responseStatus) !== 200 || !out || /MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(out)) throw new Error('limit');
+  if(Number(j.responseStatus) !== 200 || !out || /MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID/i.test(out)) throw new Error('mymemory ' + (out || j.responseStatus));
   const el = document.createElement('textarea'); el.innerHTML = out; return el.value.trim();   // 解码 HTML 实体
+}
+async function googleGtx(text, to){
+  const r = await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=' + (to === 'zh' ? 'en' : 'zh-CN') + '&tl=' + (to === 'zh' ? 'zh-CN' : 'en') + '&q=' + encodeURIComponent(text.slice(0, 1500)));
+  if(!r.ok) throw new Error('gtx http ' + r.status);
+  const j = await r.json();
+  return (j && Array.isArray(j[0]) ? j[0].map(x => x && x[0] || '').join('') : '').trim();
+}
+/* 先用 MyMemory，不行或者没翻过来（比如中英混写原样返回）就换 Google 再试 */
+async function webTranslate(text, to){
+  let last = null;
+  for(const fn of [myMemory, googleGtx]){
+    try{ const out = await fn(text, to); if(looksTranslated(out, to)) return out; last = new Error(fn.name + ' returned untranslated text'); }
+    catch(e){ last = e; console.warn(e); }
+  }
+  throw last || new Error('translate failed');
 }
 const urlOf = new WeakMap(), imgOf = new WeakMap(), imgOfUrl = new Map(), blobOfUrl = new Map();
 const url = b => { if(typeof b === 'string') return blobOfUrl.has(b) ? url(blobOfUrl.get(b)) : b; let u = urlOf.get(b); if(!u){ u = URL.createObjectURL(b); urlOf.set(b,u); } return u; };
@@ -543,6 +560,7 @@ function detect(s){
 }
 const cjkCount = s => ((s || '').match(/[㐀-鿿豈-﫿]/g) || []).length;
 /* 修复旧版本误判：含中文的描述被当成英文存了，导致英文版显示中文 */
+function autoTranslate(){ if(STANDALONE && canTr()){ const m = items.filter(missing); if(m.length) translateItems(m); } }
 async function repairLang(){
   const fixed = [];
   for(const it of items){
@@ -551,7 +569,6 @@ async function repairLang(){
     it.zh = orig; it.en = ''; it.src = 'zh';
     await dbPut(it); fixed.push(it);
   }
-  if(fixed.length && STANDALONE && canTr()) translateItems(fixed);
 }
 const descOf = it => (it[lang] || it[other(lang)] || '').trim();
 const missing = it => [it.zh, it.en].filter(x => x && x.trim()).length === 1;
@@ -774,7 +791,7 @@ function renderList(){
   $('count').textContent = items.length ? t('count')(live.length, g ? members(g).length : 0) : t('none');
   $('exBanner').hidden = !items.some(x => x.example);
   const miss = items.filter(x => missing(x) && !translating.has(x.id)).length;
-  $('fillTr').hidden = !(canTr() && miss > 1);
+  $('fillTr').hidden = !(canTr() && miss > 0);
   $('fillTr').textContent = t('fill')(miss);
 }
 function renderAll(){ renderTabs(); renderList(); }
@@ -981,7 +998,7 @@ async function seed(){
     showStore(); renderShareBar();
     try{ await pull(true); }catch(e){ console.error(e); loadError = t('loadFail'); }
     if(!loadError && !groups.length){ newGroup(); }
-    if(!loadError) await repairLang();
+    if(!loadError){ await repairLang(); setTimeout(autoTranslate, 500); }
     renderAll(); generate(); renderShareBar(); startPolling();
     return;
   }
@@ -1009,7 +1026,7 @@ async function seed(){
     active = groups[0].id; saveGroups();
   }
   await repairLang();
-  renderAll(); generate();
+  renderAll(); generate(); autoTranslate();
   try{
     if(!STANDALONE){
       const [d, s] = await Promise.all([window.claude.use('downloads').catch(() => null), window.claude.use('sample').catch(() => null)]);
