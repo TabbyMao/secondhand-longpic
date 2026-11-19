@@ -538,7 +538,20 @@ const fmtPrice = p => { p = (p||'').trim(); if(!p) return ''; return /^[\d.]/.te
 const kb = n => n >= 1048576 ? (n/1048576).toFixed(2)+' MB' : Math.max(1,Math.round(n/1024))+' KB';
 function detect(s){
   const cjk = (s.match(/[㐀-鿿豈-﫿]/g) || []).length, lat = (s.match(/[A-Za-z]/g) || []).length;
-  return cjk > 0 && cjk*3 >= lat ? 'zh' : 'en';
+  // 只要有中文就算中文（中文描述里常夹英文品牌名，英文描述基本不会出现汉字）
+  return cjk >= 2 || (cjk > 0 && lat < 4) ? 'zh' : 'en';
+}
+const cjkCount = s => ((s || '').match(/[㐀-鿿豈-﫿]/g) || []).length;
+/* 修复旧版本误判：含中文的描述被当成英文存了，导致英文版显示中文 */
+async function repairLang(){
+  const fixed = [];
+  for(const it of items){
+    if(cjkCount(it.en) < 2) continue;
+    const orig = it.src === 'en' ? it.en : (it.zh || it.en);
+    it.zh = orig; it.en = ''; it.src = 'zh';
+    await dbPut(it); fixed.push(it);
+  }
+  if(fixed.length && STANDALONE && canTr()) translateItems(fixed);
 }
 const descOf = it => (it[lang] || it[other(lang)] || '').trim();
 const missing = it => [it.zh, it.en].filter(x => x && x.trim()).length === 1;
@@ -968,6 +981,7 @@ async function seed(){
     showStore(); renderShareBar();
     try{ await pull(true); }catch(e){ console.error(e); loadError = t('loadFail'); }
     if(!loadError && !groups.length){ newGroup(); }
+    if(!loadError) await repairLang();
     renderAll(); generate(); renderShareBar(); startPolling();
     return;
   }
@@ -994,6 +1008,7 @@ async function seed(){
     if(!groups.length) newGroup();
     active = groups[0].id; saveGroups();
   }
+  await repairLang();
   renderAll(); generate();
   try{
     if(!STANDALONE){
