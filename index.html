@@ -177,7 +177,6 @@ label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4
         <div class="list" id="list"></div>
         <p class="note" id="storeNote"></p>
         <p class="note" id="trNote" hidden></p>
-        <p class="note" style="opacity:.6">v2026.11.19-2</p>
       </section>
     </div>
 
@@ -313,7 +312,7 @@ async function putRaw(rec){
 const dbPut = it => SHARE ? cloudPutItem(it) : putRaw({id:it.id, price:it.price, zh:it.zh||'', en:it.en||'', src:it.src||'', sold:it.sold, order:it.order, example:!!it.example, photos:it.photos});
 const saveGroups = () => SHARE ? cloudSaveGroups() : putRaw({id:GROUPS_KEY, groups:groups.map(g => ({id:g.id, name:g.name, show:!!g.show, note:g.note||'', ids:[...g.ids]})), active});
 async function dbDel(id){ if(SHARE) return cloudDelItem(id); if(db){ try{ await tx('readwrite', s => s.delete(id)); return; }catch(e){ db = null; } } memory.delete(id); }
-function showStore(){ $('storeNote').textContent = SHARE ? t('shareHint') : (persistent ? t('storeOk') : t('storeNo')); }
+function showStore(){ $('storeNote').textContent = SHARE ? '' : (persistent ? t('storeOk') : t('storeNo')); $('storeNote').hidden = !!SHARE; }
 
 /* ---------- 状态与工具 ---------- */
 let items = [], groups = [], active = null;
