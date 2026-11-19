@@ -800,9 +800,9 @@ function wrap(g, text, maxW){
 }
 const FONT = '-apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif';
 function layout(g, group, W, numbered, title, note){
-  const P = Math.round(W*.035), gap = Math.round(W*.012), sep = Math.round(W*.075);
+  const P = Math.round(W*.035), PV = Math.round(W*.09), gap = Math.round(W*.012), sep = Math.round(W*.075);   // PV：上下留白，避开曲面屏边缘
   const fs1 = Math.round(W*.054), fs2 = Math.round(W*.037), inner = W - 2*P, ops = [];
-  let y = P;
+  let y = PV;
   if(title){
     const fsT = Math.round(W*.072);
     g.font = `800 ${fsT}px ${FONT}`;
@@ -838,14 +838,14 @@ function layout(g, group, W, numbered, title, note){
     }
     if(textPos === 'above') y -= gap;
     else { y += Math.round(fs2*.45); textBlock(); }
-    y += i < group.length-1 ? sep : (note ? Math.round(W*.045) : P);
+    y += i < group.length-1 ? sep : (note ? Math.round(W*.045) : PV);
   });
   if(note){
     ops.push({rule:true, x:P, y, w:inner, h:Math.max(2, Math.round(W*.003))});
     y += Math.round(W*.04);
     g.font = `400 ${fs2}px ${FONT}`;
     for(const ln of wrap(g, note, inner)){ ops.push({text:ln, font:g.font, x:P, y:y + fs2}); y += Math.round(fs2*1.45); }
-    y += P;
+    y += PV;
   }
   return {H:Math.ceil(y), ops};
 }
