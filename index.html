@@ -164,6 +164,13 @@ label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4
           <button type="button" data-q="m" aria-pressed="true"></button>
           <button type="button" data-q="l" aria-pressed="false"></button>
         </div>
+        <div class="row" style="align-items:center;justify-content:space-between">
+          <span class="note" style="color:var(--muted);font-size:13px" id="tPos"></span>
+          <div class="seg" role="group" id="segP" style="flex:0 1 260px">
+            <button type="button" data-p="above" aria-pressed="true"></button>
+            <button type="button" data-p="below" aria-pressed="false"></button>
+          </div>
+        </div>
         <div class="row">
           <label for="cur"><span id="tCur"></span><input type="text" id="cur" value="$" maxlength="3"></label>
         </div>
@@ -186,7 +193,7 @@ const T = {
     save:'保存到清单', saveEdit:'保存修改', cancel:'取消编辑',
     needPhoto:'先选至少一张照片。', compress:'正在压缩照片…', badPhoto:'有一张照片读不出来，换成 JPG 或 PNG 再试。', saved:'已保存 ✓',
     list:'物品清单', ex:'下面是示例物品，方便你先看效果。', clearEx:'清除示例',
-    newImg:'+ 新建长图', gname:'长图名称', gnamePh:'例如：Badminton、Kitchen', gshow:'名称显示在图片顶部', gnote:'底部附加说明（可选）', gnotePh:'例如：全部自取，Amherst 市中心，周末可约', defName:n=>`长图 ${n}`, delGroup:'删除这张长图', delGroupConfirm:'再点一次确认',
+    newImg:'+ 新建长图', gname:'长图名称', gnamePh:'例如：Badminton、Kitchen', gshow:'名称显示在图片顶部', pos:'价格和描述的位置', above:'照片上方', below:'照片下方', gnote:'底部附加说明（可选）', gnotePh:'例如：全部自取，Amherst 市中心，周末可约', defName:n=>`长图 ${n}`, delGroup:'删除这张长图', delGroupConfirm:'再点一次确认',
     selAll:'全选在售', selNone:'全不选', none:'还没有物品', count:(l,o)=>`在售 ${l} 件 · 这张长图选了 ${o} 件`,
     noPrice:'未标价', sold:'已售', example:'示例', markSold:'标记已售', unsold:'恢复在售', editBtn:'编辑', up:'上移', down:'下移', del:'删除', delConfirm:'再点一次确认',
     storeOk:'照片和信息存在这台设备的这个浏览器里，下次打开还在。换设备或清除浏览器数据后需要重新上传。',
@@ -204,7 +211,7 @@ const T = {
     save:'Save to list', saveEdit:'Save changes', cancel:'Cancel',
     needPhoto:'Choose at least one photo first.', compress:'Compressing photos…', badPhoto:'One photo could not be read. Try a JPG or PNG.', saved:'Saved ✓',
     list:'Item list', ex:'These are sample items so you can see how it works.', clearEx:'Remove samples',
-    newImg:'+ New long image', gname:'Image name', gnamePh:'e.g. Badminton, Kitchen', gshow:'Show name at the top of the image', gnote:'Note at the bottom (optional)', gnotePh:'e.g. All pickup only, downtown Amherst, weekends work', defName:n=>`Image ${n}`, delGroup:'Delete this image', delGroupConfirm:'Tap again to delete',
+    newImg:'+ New long image', gname:'Image name', gnamePh:'e.g. Badminton, Kitchen', gshow:'Show name at the top of the image', pos:'Price & description', above:'Above photos', below:'Below photos', gnote:'Note at the bottom (optional)', gnotePh:'e.g. All pickup only, downtown Amherst, weekends work', defName:n=>`Image ${n}`, delGroup:'Delete this image', delGroupConfirm:'Tap again to delete',
     selAll:'Select all for sale', selNone:'Select none', none:'No items yet', count:(l,o)=>`${l} for sale · ${o} in this image`,
     noPrice:'No price', sold:'Sold', example:'Sample', markSold:'Mark sold', unsold:'Back for sale', editBtn:'Edit', up:'Up', down:'Down', del:'Delete', delConfirm:'Tap again to delete',
     storeOk:'Photos and details are saved in this browser on this device and will be here next time. On another device, or after clearing browser data, upload again.',
@@ -227,7 +234,7 @@ function applyLang(){
   const set = (id, k) => { $(id).textContent = t(k); };
   set('tTitle','title'); set('tPick','pick'); set('tPrice','price'); set('tDesc','desc');
   set('cancelBtn','cancel'); set('tList','list'); set('tEx','ex'); set('clearEx','clearEx'); set('selAll','selAll'); set('selNone','selNone');
-  set('tGName','gname'); set('tGShow','gshow'); set('tGNote','gnote'); $('gnote').placeholder = t('gnotePh'); set('delGroup','delGroup'); set('tOut','out'); set('tCur','cur'); set('tNum','num');
+  set('tGName','gname'); set('tGShow','gshow'); set('tPos','pos'); document.querySelector('[data-p=above]').textContent = t('above'); document.querySelector('[data-p=below]').textContent = t('below'); set('tGNote','gnote'); $('gnote').placeholder = t('gnotePh'); set('delGroup','delGroup'); set('tOut','out'); set('tCur','cur'); set('tNum','num');
   $('desc').placeholder = t('descPh'); $('gname').placeholder = t('gnamePh');
   document.querySelector('[data-q=s]').textContent = t('qs');
   document.querySelector('[data-q=m]').textContent = t('qm');
@@ -270,7 +277,7 @@ function showStore(){ $('storeNote').textContent = persistent ? t('storeOk') : t
 
 /* ---------- 状态与工具 ---------- */
 let items = [], groups = [], active = null;
-let draft = {id:null, photos:[], shown:''}, preset = 'm';
+let draft = {id:null, photos:[], shown:''}, preset = 'm', textPos = 'above';
 const translating = new Set();
 let sample = null, sampleDead = false, downloads = null;
 /* 独立使用（不在 Claude 里打开）：直接下载文件，翻译用免费的 MyMemory 接口 */
@@ -579,6 +586,15 @@ function layout(g, group, W, numbered, title, note){
     y += Math.round(W*.04);
   }
   group.forEach((it, i) => {
+    const textBlock = () => {
+      const y0 = y;
+      const head = [numbered ? (i+1)+'.' : '', fmtPrice(it.price)].filter(Boolean).join(' ');
+      if(head){ g.font = `700 ${fs2}px ${FONT}`; for(const ln of wrap(g, head, inner)){ ops.push({text:ln, font:g.font, x:P, y:y + fs2}); y += Math.round(fs2*1.45); } }
+      const d = descOf(it);
+      if(d){ g.font = `400 ${fs2}px ${FONT}`; for(const ln of wrap(g, d, inner)){ ops.push({text:ln, font:g.font, x:P, y:y + fs2}); y += Math.round(fs2*1.45); } }
+      return y > y0;
+    };
+    if(textPos === 'above'){ if(textBlock()) y += Math.round(fs2*.35); }
     let k = 0;
     for(const n of splitRows(it.imgs.length)){
       const row = it.imgs.slice(k, k+n); k += n;
@@ -594,11 +610,8 @@ function layout(g, group, W, numbered, title, note){
       });
       y += h + gap;
     }
-    y += Math.round(fs2*.45);
-    const head = [numbered ? (i+1)+'.' : '', fmtPrice(it.price)].filter(Boolean).join(' ');
-    if(head){ g.font = `700 ${fs2}px ${FONT}`; for(const ln of wrap(g, head, inner)){ ops.push({text:ln, font:g.font, x:P, y:y + fs2}); y += Math.round(fs2*1.45); } }
-    const d = descOf(it);
-    if(d){ g.font = `400 ${fs2}px ${FONT}`; for(const ln of wrap(g, d, inner)){ ops.push({text:ln, font:g.font, x:P, y:y + fs2}); y += Math.round(fs2*1.45); } }
+    if(textPos === 'above') y -= gap;
+    else { y += Math.round(fs2*.45); textBlock(); }
     y += i < group.length-1 ? sep : (note ? Math.round(W*.045) : P);
   });
   if(note){
@@ -677,6 +690,9 @@ const store = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
 document.querySelectorAll('#segQ button').forEach(b => b.onclick = () => {
   preset = b.dataset.q; document.querySelectorAll('#segQ button').forEach(x => x.setAttribute('aria-pressed', x === b)); store('lp_preset', preset); schedule();
 });
+document.querySelectorAll('#segP button').forEach(b => b.onclick = () => {
+  textPos = b.dataset.p; document.querySelectorAll('#segP button').forEach(x => x.setAttribute('aria-pressed', x === b)); store('lp_pos', textPos); schedule();
+});
 document.querySelectorAll('.lang button').forEach(b => b.onclick = () => {
   if(lang === b.dataset.lang) return; lang = b.dataset.lang; store('lp_lang', lang); applyLang(); renderAll(); schedule();
 });
@@ -716,6 +732,7 @@ async function seed(){
   try{
     const l = localStorage.getItem('lp_lang'); if(l === 'zh' || l === 'en') lang = l;
     const p = localStorage.getItem('lp_preset'); if(p && PRESETS[p]){ preset = p; document.querySelectorAll('#segQ button').forEach(x => x.setAttribute('aria-pressed', x.dataset.q === p)); }
+    const pp = localStorage.getItem('lp_pos'); if(pp === 'above' || pp === 'below'){ textPos = pp; document.querySelectorAll('#segP button').forEach(x => x.setAttribute('aria-pressed', x.dataset.p === pp)); }
     const cur = localStorage.getItem('lp_cur'); if(cur !== null) $('cur').value = cur;
     const num = localStorage.getItem('lp_num'); if(num !== null) $('num').checked = num === '1';
   }catch(e){}
