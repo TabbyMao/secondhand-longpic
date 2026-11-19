@@ -97,6 +97,17 @@ label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4
 .check{flex-direction:row;align-items:center;gap:6px;color:var(--ink);font-size:14px}
 .check input{width:18px;height:18px;accent-color:var(--ink)}
 .empty{font-size:13px;color:var(--muted);margin:0}
+.sharebar{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.sharehead{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink)}
+.dotmode{width:9px;height:9px;border-radius:50%;background:#9aa3ab;flex:none}
+.dotmode.shared{background:#1f9d6a}
+.dotmode.err{background:#c0392b}
+.shareline{display:flex;gap:6px}
+.shareline input{flex:1;min-width:0;background:#fff;font-size:13px}
+.filebtn{display:inline-flex;align-items:center;flex-direction:row;cursor:pointer;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:3px 9px;min-height:28px;font-size:13px;color:var(--ink)}
+.filebtn:hover{border-color:var(--ink)}
+.filebtn:focus-within{outline:2px solid var(--ink);outline-offset:2px}
+.filebtn input{position:absolute;opacity:0;width:1px;height:1px}
 [hidden]{display:none!important}
 .row.top{align-items:flex-start}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -139,6 +150,19 @@ label{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:4
 
       <section class="card">
         <h2><span id="tList"></span> <small id="count"></small></h2>
+        <div class="sharebar" id="sharebar">
+          <div class="sharehead"><span class="dotmode" id="modeDot"></span><span id="shareStatus"></span></div>
+          <div class="shareline" id="linkRow" hidden><input type="text" id="shareLink" readonly aria-label="Share link"><button class="small" id="copyLink" type="button"></button></div>
+          <div class="acts">
+            <button class="small" id="shareBtn" type="button" hidden></button>
+            <button class="small" id="lastShare" type="button" hidden></button>
+            <button class="small" id="resync" type="button" hidden></button>
+            <button class="small" id="leaveShare" type="button" hidden></button>
+            <button class="small" id="exportBtn" type="button"></button>
+            <label class="small filebtn" for="importFile"><input type="file" id="importFile" accept=".json,application/json"><span id="tImport"></span></label>
+          </div>
+          <p class="note" id="shareMsg" role="status" hidden></p>
+        </div>
         <div class="banner" id="exBanner" hidden><span id="tEx"></span><button class="small" id="clearEx" type="button"></button></div>
         <div class="tabs" id="tabs" role="group"></div>
         <div class="groupbar" id="groupbar">
@@ -193,7 +217,13 @@ const T = {
     save:'保存到清单', saveEdit:'保存修改', cancel:'取消编辑',
     needPhoto:'先选至少一张照片。', compress:'正在压缩照片…', badPhoto:'有一张照片读不出来，换成 JPG 或 PNG 再试。', saved:'已保存 ✓',
     list:'物品清单', ex:'下面是示例物品，方便你先看效果。', clearEx:'清除示例',
-    newImg:'+ 新建长图', gname:'长图名称', gnamePh:'例如：Badminton、Kitchen', gshow:'名称显示在图片顶部', pos:'价格和描述的位置', above:'照片上方', below:'照片下方', gnote:'底部附加说明（可选）', gnotePh:'例如：全部自取，Amherst 市中心，周末可约', defName:n=>`长图 ${n}`, delGroup:'删除这张长图', delGroupConfirm:'再点一次确认',
+    newImg:'+ 新建长图', gname:'长图名称', gnamePh:'例如：Badminton、Kitchen', gshow:'名称显示在图片顶部',
+    modeLocal:'本地清单：只存在这台设备的这个浏览器里', modeShared:'共享清单：拿到链接的人都能一起编辑', synced:t=>`已同步 ${t}`, syncing:'同步中…', syncErr:'有改动没同步上', 
+    createShare:'创建共享清单', shareArm:'再点一次：把当前物品复制到共享清单', uploading:(a,b)=>`正在上传 ${a}/${b}…`, copyLink:'复制链接', copied:'已复制 ✓',
+    leave:'回到本地清单', lastShare:'打开上次的共享清单', resync:'重新同步', 
+    notFound:'找不到这个共享清单，链接可能不完整。', loadFail:'连不上共享清单。检查网络；如果很久没用，可能需要在 Supabase 后台恢复项目。', createFail:'创建共享清单失败，检查网络后再试。',
+    exportBtn:'导出备份', importBtn:'导入备份', exporting:'正在导出…', exported:'备份已导出', imported:n=>`已导入 ${n} 件物品`, badBackup:'这个文件不是本网页导出的备份。',
+    shareHint:'把链接发给一起卖东西的人。拿到链接的人都能查看和修改，只发给信任的人。', pos:'价格和描述的位置', above:'照片上方', below:'照片下方', gnote:'底部附加说明（可选）', gnotePh:'例如：全部自取，Amherst 市中心，周末可约', defName:n=>`长图 ${n}`, delGroup:'删除这张长图', delGroupConfirm:'再点一次确认',
     selAll:'全选在售', selNone:'全不选', none:'还没有物品', count:(l,o)=>`在售 ${l} 件 · 这张长图选了 ${o} 件`,
     noPrice:'未标价', sold:'已售', example:'示例', markSold:'标记已售', unsold:'恢复在售', editBtn:'编辑', up:'上移', down:'下移', del:'删除', delConfirm:'再点一次确认',
     storeOk:'照片和信息存在这台设备的这个浏览器里，下次打开还在。换设备或清除浏览器数据后需要重新上传。',
@@ -211,7 +241,13 @@ const T = {
     save:'Save to list', saveEdit:'Save changes', cancel:'Cancel',
     needPhoto:'Choose at least one photo first.', compress:'Compressing photos…', badPhoto:'One photo could not be read. Try a JPG or PNG.', saved:'Saved ✓',
     list:'Item list', ex:'These are sample items so you can see how it works.', clearEx:'Remove samples',
-    newImg:'+ New long image', gname:'Image name', gnamePh:'e.g. Badminton, Kitchen', gshow:'Show name at the top of the image', pos:'Price & description', above:'Above photos', below:'Below photos', gnote:'Note at the bottom (optional)', gnotePh:'e.g. All pickup only, downtown Amherst, weekends work', defName:n=>`Image ${n}`, delGroup:'Delete this image', delGroupConfirm:'Tap again to delete',
+    newImg:'+ New long image', gname:'Image name', gnamePh:'e.g. Badminton, Kitchen', gshow:'Show name at the top of the image',
+    modeLocal:'Local list: saved only in this browser on this device', modeShared:'Shared list: anyone with the link can edit', synced:t=>`Synced ${t}`, syncing:'Syncing…', syncErr:'Some changes did not sync',
+    createShare:'Create shared list', shareArm:'Tap again: copy current items to a shared list', uploading:(a,b)=>`Uploading ${a}/${b}…`, copyLink:'Copy link', copied:'Copied ✓',
+    leave:'Back to local list', lastShare:'Open last shared list', resync:'Sync again',
+    notFound:'This shared list was not found. The link may be incomplete.', loadFail:'Could not reach the shared list. Check your connection; if it has not been used for a long time, the Supabase project may need restoring.', createFail:'Could not create the shared list. Check your connection and try again.',
+    exportBtn:'Export backup', importBtn:'Import backup', exporting:'Exporting…', exported:'Backup exported', imported:n=>`Imported ${n} items`, badBackup:'This file is not a backup from this page.',
+    shareHint:'Send the link to the people selling with you. Anyone with the link can view and edit, so only share it with people you trust.', pos:'Price & description', above:'Above photos', below:'Below photos', gnote:'Note at the bottom (optional)', gnotePh:'e.g. All pickup only, downtown Amherst, weekends work', defName:n=>`Image ${n}`, delGroup:'Delete this image', delGroupConfirm:'Tap again to delete',
     selAll:'Select all for sale', selNone:'Select none', none:'No items yet', count:(l,o)=>`${l} for sale · ${o} in this image`,
     noPrice:'No price', sold:'Sold', example:'Sample', markSold:'Mark sold', unsold:'Back for sale', editBtn:'Edit', up:'Up', down:'Down', del:'Delete', delConfirm:'Tap again to delete',
     storeOk:'Photos and details are saved in this browser on this device and will be here next time. On another device, or after clearing browser data, upload again.',
@@ -234,7 +270,7 @@ function applyLang(){
   const set = (id, k) => { $(id).textContent = t(k); };
   set('tTitle','title'); set('tPick','pick'); set('tPrice','price'); set('tDesc','desc');
   set('cancelBtn','cancel'); set('tList','list'); set('tEx','ex'); set('clearEx','clearEx'); set('selAll','selAll'); set('selNone','selNone');
-  set('tGName','gname'); set('tGShow','gshow'); set('tPos','pos'); document.querySelector('[data-p=above]').textContent = t('above'); document.querySelector('[data-p=below]').textContent = t('below'); set('tGNote','gnote'); $('gnote').placeholder = t('gnotePh'); set('delGroup','delGroup'); set('tOut','out'); set('tCur','cur'); set('tNum','num');
+  set('tGName','gname'); set('tGShow','gshow'); set('exportBtn','exportBtn'); set('tImport','importBtn'); set('copyLink','copyLink'); set('leaveShare','leave'); set('lastShare','lastShare'); set('resync','resync'); if(!$('shareBtn').dataset.arm) set('shareBtn','createShare'); renderShareBar(); set('tPos','pos'); document.querySelector('[data-p=above]').textContent = t('above'); document.querySelector('[data-p=below]').textContent = t('below'); set('tGNote','gnote'); $('gnote').placeholder = t('gnotePh'); set('delGroup','delGroup'); set('tOut','out'); set('tCur','cur'); set('tNum','num');
   $('desc').placeholder = t('descPh'); $('gname').placeholder = t('gnamePh');
   document.querySelector('[data-q=s]').textContent = t('qs');
   document.querySelector('[data-q=m]').textContent = t('qm');
@@ -250,6 +286,9 @@ function applyLang(){
 const PRESETS = { s:{w:720,q:.55}, m:{w:1080,q:.68}, l:{w:1440,q:.8} };
 const MAX_AREA = 15.5e6, IMPORT_MAX = 1600, GROUPS_KEY = '__groups';
 let db = null, memory = new Map(), persistent = false;
+/* 共享清单（Supabase）。网址里带 #s-<编号> 时进入共享模式 */
+const SB_URL = 'https://crxgrnqpuwqtcndsyvio.supabase.co', SB_KEY = 'sb_publishable_kuQVnfY-RXhjzlxqI-VAVg_Clf2KMzc';
+const SHARE = (() => { const m = /^#s-([a-z0-9]{20,64})$/.exec(location.hash || ''); return m ? m[1] : null; })();
 function openDB(){
   return new Promise(res => {
     try{
@@ -270,10 +309,10 @@ async function putRaw(rec){
   if(db){ try{ await tx('readwrite', s => s.put(rec)); return; }catch(e){ db = null; persistent = false; showStore(); } }
   memory.set(rec.id, rec);
 }
-const dbPut = it => putRaw({id:it.id, price:it.price, zh:it.zh||'', en:it.en||'', src:it.src||'', sold:it.sold, order:it.order, example:!!it.example, photos:it.photos});
-const saveGroups = () => putRaw({id:GROUPS_KEY, groups:groups.map(g => ({id:g.id, name:g.name, show:!!g.show, note:g.note||'', ids:[...g.ids]})), active});
-async function dbDel(id){ if(db){ try{ await tx('readwrite', s => s.delete(id)); return; }catch(e){ db = null; } } memory.delete(id); }
-function showStore(){ $('storeNote').textContent = persistent ? t('storeOk') : t('storeNo'); }
+const dbPut = it => SHARE ? cloudPutItem(it) : putRaw({id:it.id, price:it.price, zh:it.zh||'', en:it.en||'', src:it.src||'', sold:it.sold, order:it.order, example:!!it.example, photos:it.photos});
+const saveGroups = () => SHARE ? cloudSaveGroups() : putRaw({id:GROUPS_KEY, groups:groups.map(g => ({id:g.id, name:g.name, show:!!g.show, note:g.note||'', ids:[...g.ids]})), active});
+async function dbDel(id){ if(SHARE) return cloudDelItem(id); if(db){ try{ await tx('readwrite', s => s.delete(id)); return; }catch(e){ db = null; } } memory.delete(id); }
+function showStore(){ $('storeNote').textContent = SHARE ? t('shareHint') : (persistent ? t('storeOk') : t('storeNo')); }
 
 /* ---------- 状态与工具 ---------- */
 let items = [], groups = [], active = null;
@@ -300,13 +339,200 @@ async function webTranslate(text, to){
   if(Number(j.responseStatus) !== 200 || !out || /MYMEMORY WARNING|QUERY LENGTH LIMIT/i.test(out)) throw new Error('limit');
   const el = document.createElement('textarea'); el.innerHTML = out; return el.value.trim();   // 解码 HTML 实体
 }
-const urlOf = new WeakMap(), imgOf = new WeakMap();
-const url = b => { let u = urlOf.get(b); if(!u){ u = URL.createObjectURL(b); urlOf.set(b,u); } return u; };
+const urlOf = new WeakMap(), imgOf = new WeakMap(), imgOfUrl = new Map(), blobOfUrl = new Map();
+const url = b => { if(typeof b === 'string') return blobOfUrl.has(b) ? url(blobOfUrl.get(b)) : b; let u = urlOf.get(b); if(!u){ u = URL.createObjectURL(b); urlOf.set(b,u); } return u; };
 function loadImg(b){
-  let p = imgOf.get(b);
-  if(!p){ p = new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url(b); }); imgOf.set(b,p); }
+  if(typeof b === 'string' && blobOfUrl.has(b)) return loadImg(blobOfUrl.get(b));
+  const cache = typeof b === 'string' ? imgOfUrl : imgOf;
+  let p = cache.get(b);
+  if(!p){
+    p = new Promise((res, rej) => { const im = new Image(); if(typeof b === 'string') im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = rej; im.src = url(b); });
+    p.catch(() => cache.delete(b)); cache.set(b, p);
+  }
   return p;
 }
+async function toBlob(p){ if(typeof p !== 'string') return p; if(blobOfUrl.has(p)) return blobOfUrl.get(p); const r = await fetch(p); if(!r.ok) throw new Error('photo ' + r.status); return await r.blob(); }
+
+/* ---------- 共享清单：读写 Supabase ---------- */
+const sbHeaders = extra => Object.assign({apikey: SB_KEY}, extra || {});
+async function rpc(fn, body){
+  const r = await fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {method:'POST', headers:sbHeaders({'Content-Type':'application/json'}), body:JSON.stringify(body || {})});
+  const txt = await r.text();
+  if(!r.ok) throw new Error(`${fn} ${r.status} ${txt.slice(0,200)}`);
+  return txt ? JSON.parse(txt) : null;
+}
+async function uploadPhoto(lid, blob){
+  const path = `${lid}/${uid()}${Math.random().toString(36).slice(2,8)}.jpg`;
+  const r = await fetch(`${SB_URL}/storage/v1/object/photos/${path}`, {method:'POST', headers:sbHeaders({'Content-Type':'image/jpeg', 'x-upsert':'false', 'cache-control':'31536000'}), body:blob});
+  if(!r.ok) throw new Error('upload ' + r.status + ' ' + (await r.text()).slice(0,200));
+  const u = `${SB_URL}/storage/v1/object/public/photos/${path}`;
+  blobOfUrl.set(u, blob);                       // 本机直接用原图，不用再下载一遍
+  return u;
+}
+let pending = 0, lastLocal = 0, syncFailed = false, lastSyncAt = null, loadError = '';
+function track(p){
+  pending++; lastLocal = Date.now(); renderShareBar();
+  return p.then(v => { syncFailed = false; lastSyncAt = new Date(); return v; })
+          .catch(e => { console.error(e); syncFailed = true; })
+          .finally(() => { pending--; lastLocal = Date.now(); renderShareBar(); });
+}
+async function itemPayload(lid, it){
+  for(let i = 0; i < it.photos.length; i++) if(typeof it.photos[i] !== 'string') it.photos[i] = await uploadPhoto(lid, it.photos[i]);
+  return {id:it.id, price:it.price||'', zh:it.zh||'', en:it.en||'', src:it.src||'', sold:!!it.sold, order:it.order, photos:it.photos.slice()};
+}
+const itemChains = new Map();          // 同一件物品的写入按顺序进行，避免照片重复上传
+const cloudPutItem = it => {
+  const p = (itemChains.get(it.id) || Promise.resolve()).catch(() => {}).then(async () => { await rpc('put_item', {lid:SHARE, item: await itemPayload(SHARE, it)}); });
+  itemChains.set(it.id, p); return track(p);
+};
+const cloudDelItem = id => track(rpc('del_item', {lid:SHARE, iid:id}));
+let groupTimer = 0, syncedGroupIds = new Set();
+const groupPayload = (g, i) => ({id:g.id, name:g.name||'', show:!!g.show, note:g.note||'', ids:[...g.ids], order:i});
+function cloudSaveGroups(){
+  try{ localStorage.setItem('lp_active_' + SHARE, active || ''); }catch(e){}
+  lastLocal = Date.now(); clearTimeout(groupTimer);
+  groupTimer = setTimeout(() => track((async () => {
+    const now = new Set(groups.map(g => g.id));
+    for(const id of syncedGroupIds) if(!now.has(id)) await rpc('del_group', {lid:SHARE, gid:id});
+    for(const [i, g] of groups.entries()) await rpc('put_group', {lid:SHARE, grp:groupPayload(g, i)});
+    syncedGroupIds = now;
+  })()), 600);
+  return Promise.resolve();
+}
+let lastSig = '';
+async function pull(first){
+  const d = await rpc('get_list', {lid:SHARE});
+  if(d === null){ loadError = t('notFound'); renderShareBar(); return false; }
+  loadError = ''; lastSyncAt = new Date();
+  const sig = JSON.stringify(d);
+  if(sig === lastSig && !first){ renderShareBar(); return true; }
+  lastSig = sig;
+  const prev = new Map(items.map(x => [x.id, x]));
+  items = (d.items || []).map(x => Object.assign(prev.get(x.id) || {}, x, {photos:(x.photos || []).slice()})).filter(x => x.photos.length).sort((a,b) => a.order - b.order);
+  const ok = new Set(items.map(x => x.id));
+  groups = (d.groups || []).sort((a,b) => (a.order||0) - (b.order||0)).map(g => ({id:g.id, name:g.name||'', show:!!g.show, note:g.note||'', ids:new Set((g.ids||[]).filter(id => ok.has(id)))}));
+  syncedGroupIds = new Set(groups.map(g => g.id));
+  if(!groups.some(g => g.id === active)){
+    let saved = null; try{ saved = localStorage.getItem('lp_active_' + SHARE); }catch(e){}
+    active = groups.some(g => g.id === saved) ? saved : (groups[0] && groups[0].id) || null;
+  }
+  if(!first){ renderAll(); schedule(); }
+  renderShareBar();
+  return true;
+}
+function startPolling(){
+  setInterval(() => {
+    if(document.visibilityState !== 'visible' || pending || Date.now() - lastLocal < 4000 || loadError === t('notFound')) return;
+    pull(false).catch(e => { console.error(e); });
+  }, 8000);
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && !pending) pull(false).catch(() => {}); });
+}
+const hhmm = d => d ? d.toLocaleTimeString(lang === 'zh' ? 'zh-CN' : 'en-US', {hour:'2-digit', minute:'2-digit'}) : '';
+function renderShareBar(){
+  if(!$('sharebar')) return;
+  const shared = !!SHARE;
+  $('modeDot').className = 'dotmode' + (shared ? (syncFailed || loadError ? ' err' : ' shared') : '');
+  let status = shared ? t('modeShared') : t('modeLocal');
+  if(shared){
+    if(loadError) status += ' · ' + loadError;
+    else if(pending) status += ' · ' + t('syncing');
+    else if(syncFailed) status += ' · ' + t('syncErr');
+    else if(lastSyncAt) status += ' · ' + t('synced')(hhmm(lastSyncAt));
+  }
+  $('shareStatus').textContent = status;
+  $('linkRow').hidden = !shared;
+  if(shared) $('shareLink').value = location.origin + location.pathname + '#s-' + SHARE;
+  const canShare = STANDALONE && /^https?:$/.test(location.protocol);
+  $('shareBtn').hidden = shared || !canShare;
+  $('leaveShare').hidden = !shared;
+  $('resync').hidden = !(shared && syncFailed && !pending);
+  let last = null; try{ last = localStorage.getItem('lp_last_share'); }catch(e){}
+  $('lastShare').hidden = shared || !canShare || !last;
+}
+function msg(text){ $('shareMsg').textContent = text || ''; $('shareMsg').hidden = !text; }
+$('copyLink').onclick = async () => {
+  const inp = $('shareLink');
+  try{ await navigator.clipboard.writeText(inp.value); }catch(e){ inp.focus(); inp.select(); try{ document.execCommand('copy'); }catch(_){} }
+  $('copyLink').textContent = t('copied'); setTimeout(() => { $('copyLink').textContent = t('copyLink'); }, 1600);
+};
+$('shareLink').addEventListener('focus', e => e.target.select());
+$('leaveShare').onclick = () => { location.hash = ''; location.reload(); };
+$('lastShare').onclick = () => { let last = null; try{ last = localStorage.getItem('lp_last_share'); }catch(e){} if(last){ location.hash = 's-' + last; location.reload(); } };
+$('resync').onclick = async () => {
+  syncFailed = false;
+  for(const it of items) await cloudPutItem(it);
+  cloudSaveGroups();
+};
+$('shareBtn').onclick = async () => {
+  const b = $('shareBtn');
+  if(!b.dataset.arm){ b.dataset.arm = '1'; b.textContent = t('shareArm'); setTimeout(() => { if(b.dataset.arm === '1'){ delete b.dataset.arm; b.textContent = t('createShare'); } }, 5000); return; }
+  b.dataset.arm = 'busy'; b.disabled = true;
+  const lid = Array.from(crypto.getRandomValues(new Uint8Array(16)), x => 'abcdefghijklmnopqrstuvwxyz0123456789'[x % 36]).join('') + Date.now().toString(36);
+  try{
+    await rpc('create_list', {lid});
+    const own = items.filter(x => !x.example);
+    for(const [i, it] of own.entries()){
+      msg(t('uploading')(i+1, own.length));
+      const copy = Object.assign({}, it, {photos: it.photos.slice()});
+      await rpc('put_item', {lid, item: await itemPayload(lid, copy)});
+    }
+    const ok = new Set(own.map(x => x.id));
+    const gs = groups.map(g => Object.assign({}, g, {ids: new Set([...g.ids].filter(id => ok.has(id)))}));
+    for(const [i, g] of gs.entries()) await rpc('put_group', {lid, grp: groupPayload(g, i)});
+    try{ localStorage.setItem('lp_last_share', lid); localStorage.setItem('lp_active_' + lid, active || ''); }catch(e){}
+    location.hash = 's-' + lid; location.reload();
+  }catch(e){
+    console.error(e); msg(t('createFail'));
+    delete b.dataset.arm; b.disabled = false; b.textContent = t('createShare');
+  }
+};
+
+/* ---------- 导出 / 导入备份 ---------- */
+const blobToDataURL = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(b); });
+function dataURLToBlob(d){
+  const [head, body] = d.split(','); const mime = (/data:([^;]+)/.exec(head) || [])[1] || 'image/jpeg';
+  const bin = atob(body), arr = new Uint8Array(bin.length); for(let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], {type:mime});
+}
+$('exportBtn').onclick = async () => {
+  if(!downloads){ msg(t('saveFail')); return; }
+  msg(t('exporting'));
+  try{
+    const out = {app:'secondhand-longpic', v:1, exportedAt:new Date().toISOString(), items:[], groups:groups.map(groupPayload)};
+    for(const it of items.filter(x => !x.example)){
+      const photos = []; for(const p of it.photos) photos.push(await blobToDataURL(await toBlob(p)));
+      out.items.push({id:it.id, price:it.price||'', zh:it.zh||'', en:it.en||'', src:it.src||'', sold:!!it.sold, order:it.order, photos});
+    }
+    const d = new Date(), stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    await downloads.save({filename:`${t('fileBase')}-backup-${stamp}.json`, data:new Blob([JSON.stringify(out)], {type:'application/json'})});
+    msg(t('exported'));
+  }catch(e){ console.error(e); msg(e && e.code === 'declined' ? '' : t('saveFail')); }
+};
+$('importFile').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0]; e.target.value = ''; if(!f) return;
+  let data; try{ data = JSON.parse(await f.text()); }catch(err){ msg(t('badBackup')); return; }
+  if(!data || data.app !== 'secondhand-longpic' || !Array.isArray(data.items)){ msg(t('badBackup')); return; }
+  const base = items.length ? Math.max(...items.map(x => x.order || 0)) : 0;
+  let n = 0;
+  for(const [i, raw] of data.items.entries()){
+    if(!raw || !raw.id || !Array.isArray(raw.photos) || !raw.photos.length) continue;
+    const photos = raw.photos.map(p => typeof p === 'string' && p.startsWith('data:') ? dataURLToBlob(p) : p).filter(p => typeof p !== 'string' || /^https:/.test(p));
+    let it = items.find(x => x.id === raw.id);
+    const fields = {price:raw.price||'', zh:raw.zh||'', en:raw.en||'', src:raw.src||'', sold:!!raw.sold, photos};
+    if(it) Object.assign(it, fields); else { it = Object.assign({id:raw.id, order: base + (raw.order || i + 1)}, fields); items.push(it); }
+    await dbPut(it); n++;
+  }
+  const ok = new Set(items.map(x => x.id));
+  for(const rg of (Array.isArray(data.groups) ? data.groups : [])){
+    if(!rg || !rg.id) continue;
+    let g = groups.find(x => x.id === rg.id);
+    const ids = (rg.ids || []).filter(id => ok.has(id));
+    if(g){ g.name = rg.name || g.name; g.show = !!rg.show; g.note = rg.note || ''; ids.forEach(id => g.ids.add(id)); }
+    else groups.push({id:rg.id, name:rg.name||'', show:!!rg.show, note:rg.note||'', ids:new Set(ids)});
+  }
+  if(!activeGroup() && groups.length) active = groups[0].id;
+  saveGroups(); renderAll(); schedule(); msg(t('imported')(n));
+});
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 const fmtPrice = p => { p = (p||'').trim(); if(!p) return ''; return /^[\d.]/.test(p) ? ($('cur').value.trim() + p) : p; };
 const kb = n => n >= 1048576 ? (n/1048576).toFixed(2)+' MB' : Math.max(1,Math.round(n/1024))+' KB';
@@ -737,6 +963,14 @@ async function seed(){
     const num = localStorage.getItem('lp_num'); if(num !== null) $('num').checked = num === '1';
   }catch(e){}
   applyLang(); resetEditor();
+  if(SHARE){
+    try{ localStorage.setItem('lp_last_share', SHARE); }catch(e){}
+    showStore(); renderShareBar();
+    try{ await pull(true); }catch(e){ console.error(e); loadError = t('loadFail'); }
+    if(!loadError && !groups.length){ newGroup(); }
+    renderAll(); generate(); renderShareBar(); startPolling();
+    return;
+  }
   db = await openDB(); persistent = !!db;
   const all = await dbAll();
   const gRec = all.find(x => x && x.id === GROUPS_KEY);
